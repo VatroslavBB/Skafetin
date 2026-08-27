@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Skafetin.Api/Skafetin.Api.csproj" />
+  <Project Path="Skafetin.App/Skafetin.App.csproj" />
+  <Project Path="Skafetin.Shared/Skafetin.Shared.csproj" />
+</Solution>
