@@ -36,7 +36,6 @@ public class SkafetinDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-
         modelBuilder.Entity<Equipment>().HasIndex(e => e.InventoryNumber).IsUnique();
         modelBuilder.Entity<Inventory>().HasIndex(i => i.Code).IsUnique();
         modelBuilder.Entity<Employee>().HasIndex(e => e.Email).IsUnique();
@@ -44,11 +43,9 @@ public class SkafetinDbContext : DbContext
         modelBuilder.Entity<AppUser>().HasIndex(u => u.Email).IsUnique();
         modelBuilder.Entity<AppRole>().HasIndex(r => r.Name).IsUnique();
 
-
         modelBuilder.Entity<Equipment>()
             .Property(e => e.PurchaseValue)
             .HasColumnType("decimal(18,2)");
-
 
         modelBuilder.Entity<Location>()
             .HasOne(l => l.LocationType)
@@ -56,13 +53,11 @@ public class SkafetinDbContext : DbContext
             .HasForeignKey(l => l.LocationTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
-
         modelBuilder.Entity<Employee>()
             .HasOne(e => e.Location)
             .WithMany(l => l.Employees)
             .HasForeignKey(e => e.LocationId)
             .OnDelete(DeleteBehavior.Restrict);
-
 
         modelBuilder.Entity<Equipment>()
             .HasOne(e => e.EquipmentCategory)
@@ -81,7 +76,6 @@ public class SkafetinDbContext : DbContext
             .WithMany(l => l.Equipment)
             .HasForeignKey(e => e.LocationId)
             .OnDelete(DeleteBehavior.Restrict);
-
 
         modelBuilder.Entity<Assignment>()
             .HasOne(a => a.Equipment)
@@ -107,7 +101,6 @@ public class SkafetinDbContext : DbContext
             .HasForeignKey(a => a.PreviousAssignmentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-
         modelBuilder.Entity<Inventory>()
             .HasOne(i => i.Location)
             .WithMany(l => l.Inventories)
@@ -125,7 +118,6 @@ public class SkafetinDbContext : DbContext
             .WithMany()
             .HasForeignKey(i => i.CreatedByEmployeeId)
             .OnDelete(DeleteBehavior.Restrict);
-
 
         modelBuilder.Entity<InventoryItem>()
             .HasOne(item => item.Inventory)
@@ -163,7 +155,6 @@ public class SkafetinDbContext : DbContext
             .HasForeignKey(item => item.CheckedByEmployeeId)
             .OnDelete(DeleteBehavior.SetNull);
 
-
         modelBuilder.Entity<EquipmentRequest>()
             .HasOne(r => r.RequestedByEmployee)
             .WithMany()
@@ -200,7 +191,6 @@ public class SkafetinDbContext : DbContext
             .HasForeignKey(r => r.ResultingEquipmentId)
             .OnDelete(DeleteBehavior.SetNull);
 
-
         modelBuilder.Entity<WriteOffRequest>()
             .HasOne(w => w.Equipment)
             .WithMany()
@@ -225,7 +215,6 @@ public class SkafetinDbContext : DbContext
             .HasForeignKey(w => w.ProcessedByEmployeeId)
             .OnDelete(DeleteBehavior.SetNull);
 
-
         modelBuilder.Entity<EquipmentMedia>()
             .HasOne(m => m.Equipment)
             .WithMany(e => e.Media)
@@ -237,7 +226,6 @@ public class SkafetinDbContext : DbContext
             .WithMany()
             .HasForeignKey(m => m.UploadedByEmployeeId)
             .OnDelete(DeleteBehavior.SetNull);
-
 
         modelBuilder.Entity<EquipmentStatusHistory>()
             .HasOne(h => h.Equipment)
@@ -275,7 +263,6 @@ public class SkafetinDbContext : DbContext
             .HasForeignKey(h => h.ChangedByEmployeeId)
             .OnDelete(DeleteBehavior.SetNull);
 
-
         modelBuilder.Entity<AppUserRole>()
             .HasKey(ur => new { ur.AppUserId, ur.AppRoleId });
 
@@ -296,7 +283,6 @@ public class SkafetinDbContext : DbContext
             .WithMany()
             .HasForeignKey(u => u.EmployeeId)
             .OnDelete(DeleteBehavior.Restrict);
-
 
         modelBuilder.Entity<LocationType>().HasData(
             new LocationType { Id = 1, Name = "Ured" },
