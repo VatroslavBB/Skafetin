@@ -64,6 +64,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SkafetinDbContext>();
     await db.Database.MigrateAsync();
+
+    if (!await db.Locations.AnyAsync())
+        await SeedData.SeedAsync(db);
 }
 
 // Configure the HTTP request pipeline.
