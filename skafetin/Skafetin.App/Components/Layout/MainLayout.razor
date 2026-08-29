@@ -1,22 +1,28 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using Skafetin.App.Theme
 
-<MudThemeProvider />
+<MudThemeProvider Theme="SkafetinTheme.Instance" @bind-IsDarkMode="isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary">
-        <MudText Typo="Typo.h6">
-            Skafetin
-        </MudText>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="ToggleDrawer" />
+        <MudImage Src="skafetin-znak.svg" Height="44" Class="ml-2" Alt="Škafetin" />
+        <MudText Typo="Typo.h5" Class="ml-3">Škafetin</MudText>
         <MudSpacer />
-        <MudText Typo="Typo.body2">
-            Sustav za praćenje imovine
+        <MudText Typo="Typo.body2" Class="d-none d-sm-flex">
+            Evidencija imovine Županije
         </MudText>
+        <MudIconButton Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit"
+                       OnClick="@(() => isDarkMode = !isDarkMode)" />
     </MudAppBar>
 
-    <MudDrawer Open="true" Elevation="1" Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always">
+    <MudDrawer @bind-Open="isDrawerOpen" Elevation="1"
+               Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always">
         <NavMenu />
     </MudDrawer>
 
@@ -25,3 +31,9 @@
     </MudMainContent>
 </MudLayout>
 
+@code {
+    private bool isDrawerOpen = true;
+    private bool isDarkMode;
+
+    private void ToggleDrawer() => isDrawerOpen = !isDrawerOpen;
+}

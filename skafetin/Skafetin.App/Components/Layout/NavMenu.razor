@@ -1,5 +1,57 @@
-﻿<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
-        Home
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+        Početna
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.caption" Class="px-4">IMOVINA</MudText>
+
+    <MudNavLink Href="/equipment" Icon="@Icons.Material.Filled.Inventory2" Disabled="true">
+        Oprema
+    </MudNavLink>
+    <MudNavLink Href="/assignments" Icon="@Icons.Material.Filled.AssignmentTurnedIn" Disabled="true">
+        Zaduženja
+    </MudNavLink>
+    <MudNavLink Href="/inventories" Icon="@Icons.Material.Filled.FactCheck" Disabled="true">
+        Inventure
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.caption" Class="px-4">ZAHTJEVI</MudText>
+
+    <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail" Disabled="true">
+        Zahtjevi za opremom
+    </MudNavLink>
+    <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep" Disabled="true">
+        Otpis
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.caption" Class="px-4">ŠIFRARNICI</MudText>
+
+    <MudNavLink Href="/locations" Icon="@Icons.Material.Filled.Place" Disabled="true">
+        Lokacije
+    </MudNavLink>
+    <MudNavLink Href="/employees" Icon="@Icons.Material.Filled.Badge" Disabled="true">
+        Zaposlenici
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.caption" Class="px-4">MOJE</MudText>
+
+    <MudNavLink Href="/my-equipment" Icon="@Icons.Material.Filled.Laptop" Disabled="true">
+        Moja oprema
+    </MudNavLink>
+    <MudNavLink Href="/my-requests" Icon="@Icons.Material.Filled.Outbox" Disabled="true">
+        Moji zahtjevi
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts" Disabled="true">
+        Korisnici i uloge
+    </MudNavLink>
+    <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login" Disabled="true">
+        Prijava
     </MudNavLink>
 </MudNavMenu>
