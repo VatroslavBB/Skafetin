@@ -1,0 +1,21 @@
+﻿@if (IsLoading)
+{
+    <MudPaper Class="pa-8 d-flex justify-center" Elevation="0">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </MudPaper>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@ErrorMessage</MudAlert>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
+

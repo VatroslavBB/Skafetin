@@ -1,0 +1,20 @@
+﻿<div class="d-flex align-center justify-space-between mb-4">
+    <div>
+        <MudText Typo="Typo.h4">@Title</MudText>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@Subtitle</MudText>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="d-flex gap-2">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}
+
