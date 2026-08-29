@@ -8,14 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Components\Shared\DialogExtension.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Components\Shared\DialogExtension.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="MudBlazor" Version="9.9.0" />
   </ItemGroup>
 
