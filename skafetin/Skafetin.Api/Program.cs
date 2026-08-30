@@ -1,4 +1,4 @@
-using Skafetin.Api.Data;
+﻿using Skafetin.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -65,8 +65,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<SkafetinDbContext>();
     await db.Database.MigrateAsync();
 
-    if (!await db.Locations.AnyAsync())
-        await SeedData.SeedAsync(db);
+    // Svaka Seed*Async metoda sama provjerava je li njezina tablica prazna,
+    // pa se ovo smije zvati uvijek - novi seed se primijeni i na postojeću bazu.
+    await SeedData.SeedAsync(db);
 }
 
 // Configure the HTTP request pipeline.

@@ -1,0 +1,166 @@
+﻿@page "/equipment/create"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Nova oprema</PageTitle>
+
+<PageHeader Title="Nova oprema" Subtitle="Unos novog komada opreme u evidenciju" />
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudPaper Class="pa-6" Elevation="0" Style="max-width: 860px;">
+        <EditForm Model="model" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="4">
+                    <MudTextField Label="Inventurni broj"
+                                  @bind-Value="model.InventoryNumber"
+                                  For="@(() => model.InventoryNumber)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="8">
+                    <MudTextField Label="Naziv"
+                                  @bind-Value="model.Name"
+                                  For="@(() => model.Name)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Proizvođač"
+                                  @bind-Value="model.Manufacturer"
+                                  For="@(() => model.Manufacturer)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Model"
+                                  @bind-Value="model.Model"
+                                  For="@(() => model.Model)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="int"
+                               Label="Kategorija"
+                               @bind-Value="model.EquipmentCategoryId"
+                               For="@(() => model.EquipmentCategoryId)"
+                               Variant="Variant.Outlined">
+                        @foreach (var category in categories)
+                        {
+                            <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="int"
+                               Label="Status"
+                               @bind-Value="model.EquipmentStatusId"
+                               For="@(() => model.EquipmentStatusId)"
+                               Variant="Variant.Outlined">
+                        @foreach (var status in statuses)
+                        {
+                            <MudSelectItem T="int" Value="@status.Id">@status.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="int"
+                               Label="Lokacija"
+                               @bind-Value="model.LocationId"
+                               For="@(() => model.LocationId)"
+                               Variant="Variant.Outlined">
+                        @foreach (var location in locations)
+                        {
+                            <MudSelectItem T="int" Value="@location.Id">@location.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal?"
+                                     Label="Nabavna vrijednost (EUR)"
+                                     @bind-Value="model.PurchaseValue"
+                                     For="@(() => model.PurchaseValue)"
+                                     Min="0"
+                                     Format="0.00"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="Opis"
+                                  @bind-Value="model.Description"
+                                  For="@(() => model.Description)"
+                                  Lines="3"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex gap-2 mt-6">
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="isSaving">
+                    Spremi
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="isSaving"
+                           OnClick="@(() => Navigation.NavigateTo("/equipment"))">
+                    Odustani
+                </MudButton>
+            </div>
+        </EditForm>
+    </MudPaper>
+</LoadingArea>
+
+@code {
+    // Status "Na skladištu" je razuman početak za novi komad opreme.
+    private const int StatusNaSkladistuId = 1;
+
+    private SaveEquipmentDto model = new() { EquipmentStatusId = StatusNaSkladistuId };
+
+    private List<LookupDto> categories = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> locations = new();
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categoryResult = await Api.GetAsync<List<LookupDto>>("api/equipmentcategories");
+        var statusResult = await Api.GetAsync<List<LookupDto>>("api/equipmentstatuses");
+        var locationResult = await Api.GetAsync<List<LookupDto>>("api/locations/lookup");
+
+        if (!categoryResult.IsSuccess || !statusResult.IsSuccess || !locationResult.IsSuccess)
+        {
+            errorMessage = categoryResult.ErrorMessage
+                        ?? statusResult.ErrorMessage
+                        ?? locationResult.ErrorMessage;
+            isLoading = false;
+            return;
+        }
+
+        categories = categoryResult.Data ?? new List<LookupDto>();
+        statuses = statusResult.Data ?? new List<LookupDto>();
+        locations = locationResult.Data ?? new List<LookupDto>();
+
+        isLoading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        isSaving = true;
+
+        var result = await Api.PostAsync<EquipmentDto>("api/equipment", model);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Oprema je spremljena.", Severity.Success);
+            Navigation.NavigateTo("/equipment");
+        }
+        else
+        {
+            // Ovdje stiže i poruka o dupliranom inventurnom broju iz kontrolera.
+            Snackbar.Add(result.ErrorMessage ?? "Spremanje nije uspjelo.", Severity.Error);
+            isSaving = false;
+        }
+    }
+}

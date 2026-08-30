@@ -1,0 +1,272 @@
+﻿@page "/equipment"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Oprema</PageTitle>
+
+<PageHeader Title="Oprema" Subtitle="Evidencija opreme s pretragom i filtriranjem na poslužitelju">
+    <Actions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => Navigation.NavigateTo("/equipment/create"))">
+            Nova oprema
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="pa-4 mb-4" Elevation="0">
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" md="4">
+            <MudTextField T="string"
+                          @bind-Value="search"
+                          Label="Pretraga"
+                          Placeholder="Naziv ili inventurni broj"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="ReloadAsync"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedCategoryId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Kategorija"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var category in categories)
+                {
+                    <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedStatusId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Status"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@status.Id">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedLocationId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Lokacija"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var location in locations)
+                {
+                    <MudSelectItem T="int?" Value="@location.Id">@location.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FilterAltOff"
+                       OnClick="ClearFiltersAsync"
+                       FullWidth="true">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@* ServerData umjesto Items: dohvat, sortiranje i stranicanje rade se na poslužitelju. *@
+<MudTable T="EquipmentDto"
+          @ref="table"
+          ServerData="LoadServerDataAsync"
+          Hover="true"
+          Striped="true"
+          Elevation="0"
+          Loading="isLoading"
+          LoadingProgressColor="Color.Primary">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="EquipmentDto" SortLabel="inventoryNumber">Inventurni broj</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="EquipmentDto" SortLabel="name" InitialDirection="SortDirection.Ascending">Naziv</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="EquipmentDto" SortLabel="category">Kategorija</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="EquipmentDto" SortLabel="status">Status</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="EquipmentDto" SortLabel="location">Lokacija</MudTableSortLabel></MudTh>
+        <MudTh Style="width: 160px;"></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Inventurni broj">@context.InventoryNumber</MudTd>
+        <MudTd DataLabel="Naziv">@context.Name</MudTd>
+        <MudTd DataLabel="Kategorija">@context.EquipmentCategoryName</MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string"
+                     Size="Size.Small"
+                     Color="@StatusColor(context.EquipmentStatusName)"
+                     Variant="Variant.Text">
+                @context.EquipmentStatusName
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Lokacija">@context.LocationName</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                           Size="Size.Small"
+                           Title="Detalji"
+                           OnClick="@(() => Navigation.NavigateTo($"/equipment/{context.Id}"))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Size="Size.Small"
+                           OnClick="@(() => Navigation.NavigateTo($"/equipment/edit/{context.Id}"))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(() => DeleteAsync(context))" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Class="pa-4">Nema opreme koja odgovara filtrima.</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager RowsPerPageString="Redaka po stranici:"
+                       PageSizeOptions="new[] { 10, 20, 50 }"
+                       InfoFormat="{first_item}-{last_item} od {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<EquipmentDto>? table;
+
+    private List<LookupDto> categories = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> locations = new();
+
+    private string? search;
+    private int? selectedCategoryId;
+    private int? selectedStatusId;
+    private int? selectedLocationId;
+
+    private bool isLoading;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Šifrarnici se dohvaćaju jednom; popis opreme puni MudTable preko ServerData.
+        categories = await LoadLookupAsync("api/equipmentcategories");
+        statuses = await LoadLookupAsync("api/equipmentstatuses");
+        locations = await LoadLookupAsync("api/locations/lookup");
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task<TableData<EquipmentDto>> LoadServerDataAsync(TableState state, CancellationToken token)
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var parameters = new List<string>
+        {
+            // MudTable broji stranice od nule, Api od jedinice.
+            $"page={state.Page + 1}",
+            $"pageSize={state.PageSize}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (selectedCategoryId.HasValue)
+            parameters.Add($"categoryId={selectedCategoryId.Value}");
+
+        if (selectedStatusId.HasValue)
+            parameters.Add($"statusId={selectedStatusId.Value}");
+
+        if (selectedLocationId.HasValue)
+            parameters.Add($"locationId={selectedLocationId.Value}");
+
+        if (!string.IsNullOrWhiteSpace(state.SortLabel) && state.SortDirection != SortDirection.None)
+        {
+            parameters.Add($"sortBy={state.SortLabel}");
+            parameters.Add($"sortDesc={(state.SortDirection == SortDirection.Descending).ToString().ToLowerInvariant()}");
+        }
+
+        var url = "api/equipment?" + string.Join("&", parameters);
+
+        var result = await Api.GetAsync<PagedResultDto<EquipmentDto>>(url);
+
+        isLoading = false;
+
+        if (!result.IsSuccess || result.Data is null)
+        {
+            errorMessage = result.ErrorMessage ?? "Dohvat opreme nije uspio.";
+            return new TableData<EquipmentDto> { Items = new List<EquipmentDto>(), TotalItems = 0 };
+        }
+
+        return new TableData<EquipmentDto>
+        {
+            Items = result.Data.Items,
+            TotalItems = result.Data.TotalCount
+        };
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (table is null)
+            return;
+
+        // Promjena filtra mora vratiti na prvu stranicu, inače korisnik ostane
+        // na stranici 5 rezultata kojih više nema. NavigateTo sam pokreće dohvat,
+        // pa se ReloadServerData zove samo kad smo ionako na prvoj stranici.
+        if (table.CurrentPage != 0)
+            table.NavigateTo(0);
+        else
+            await table.ReloadServerData();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedCategoryId = null;
+        selectedStatusId = null;
+        selectedLocationId = null;
+        await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(EquipmentDto equipment)
+    {
+        if (!await DialogService.ConfirmDeleteAsync($"Oprema \"{equipment.Name}\" ({equipment.InventoryNumber})"))
+            return;
+
+        var result = await Api.DeleteAsync($"api/equipment/{equipment.Id}");
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Oprema je obrisana.", Severity.Success);
+            if (table is not null)
+                await table.ReloadServerData();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Brisanje nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private static Color StatusColor(string statusName) => statusName switch
+    {
+        "Na skladištu" => Color.Success,
+        "Zaduženo" => Color.Info,
+        "Na servisu" => Color.Warning,
+        "Nedostaje" => Color.Error,
+        _ => Color.Default
+    };
+}

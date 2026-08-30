@@ -1,0 +1,178 @@
+﻿@page "/equipment/{Id:int}"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(equipment?.Name ?? "Oprema")</PageTitle>
+
+<PageHeader Title="@(equipment?.Name ?? "Oprema")" Subtitle="@equipment?.InventoryNumber">
+    <Actions>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => Navigation.NavigateTo("/equipment"))">
+            Natrag na popis
+        </MudButton>
+        @if (equipment is not null)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="@(() => Navigation.NavigateTo($"/equipment/edit/{Id}"))">
+                Uredi
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteAsync">
+                Obriši
+            </MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    @if (equipment is not null)
+    {
+        <MudPaper Class="pa-4" Elevation="0">
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6">
+
+                <MudTabPanel Text="Podaci" Icon="@Icons.Material.Filled.Description">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSimpleTable Dense="true" Hover="false" Elevation="0">
+                                <tbody>
+                                    <tr>
+                                        <td class="mud-text-secondary" style="width: 45%;">Inventurni broj</td>
+                                        <td>@equipment.InventoryNumber</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Naziv</td>
+                                        <td>@equipment.Name</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Kategorija</td>
+                                        <td>@equipment.EquipmentCategoryName</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Status</td>
+                                        <td>
+                                            <MudChip T="string"
+                                                     Size="Size.Small"
+                                                     Color="@StatusColor(equipment.EquipmentStatusName)"
+                                                     Variant="Variant.Text">
+                                                @equipment.EquipmentStatusName
+                                            </MudChip>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Lokacija</td>
+                                        <td>@equipment.LocationName</td>
+                                    </tr>
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSimpleTable Dense="true" Hover="false" Elevation="0">
+                                <tbody>
+                                    <tr>
+                                        <td class="mud-text-secondary" style="width: 45%;">Proizvođač</td>
+                                        <td>@Or(equipment.Manufacturer)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Model</td>
+                                        <td>@Or(equipment.Model)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Nabavna vrijednost</td>
+                                        <td>@(equipment.PurchaseValue.HasValue ? $"{equipment.PurchaseValue.Value:N2} EUR" : "-")</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Uneseno u evidenciju</td>
+                                        <td>@equipment.CreatedAt.ToString("dd.MM.yyyy.")</td>
+                                    </tr>
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Opis</MudText>
+                            <MudText Typo="Typo.body2">@Or(equipment.Description)</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Zaduženja" Icon="@Icons.Material.Filled.AssignmentTurnedIn">
+                    @* Puni se u fazi 7 (feature/assignments), preko GET /api/assignments/equipment/{id}. *@
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                        Zaduženja se prikazuju nakon što se izradi modul zaduženja.
+                    </MudAlert>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Dokumenti" Icon="@Icons.Material.Filled.AttachFile">
+                    @* Puni se u fazi 11 (feature/equipmentMedia), preko GET /api/equipmentmedia/equipment/{id}. *@
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                        Slike i dokumenti se prikazuju nakon što se izradi modul datoteka.
+                    </MudAlert>
+                </MudTabPanel>
+
+            </MudTabs>
+        </MudPaper>
+    }
+</LoadingArea>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EquipmentDetailsDto? equipment;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var result = await Api.GetAsync<EquipmentDetailsDto>($"api/equipment/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+            equipment = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Oprema nije pronađena.";
+
+        isLoading = false;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (equipment is null)
+            return;
+
+        if (!await DialogService.ConfirmDeleteAsync($"Oprema \"{equipment.Name}\" ({equipment.InventoryNumber})"))
+            return;
+
+        var result = await Api.DeleteAsync($"api/equipment/{Id}");
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Oprema je obrisana.", Severity.Success);
+            Navigation.NavigateTo("/equipment");
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Brisanje nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private static string Or(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static Color StatusColor(string statusName) => statusName switch
+    {
+        "Na skladištu" => Color.Success,
+        "Zaduženo" => Color.Info,
+        "Na servisu" => Color.Warning,
+        "Nedostaje" => Color.Error,
+        _ => Color.Default
+    };
+}
