@@ -1,6 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Skafetin.Api.Data;
+using Skafetin.Api.Security;
 using Skafetin.Shared.DTOs;
 using Skafetin.Shared.Models;
 
@@ -17,6 +19,7 @@ public class EmployeesController : ControllerBase
         _context = context;
     }
 
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpGet]
     public async Task<ActionResult<List<EmployeeDto>>> GetEmployees(
         [FromQuery] string? search,
@@ -78,6 +81,7 @@ public class EmployeesController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<EmployeeDto>> GetEmployeeById(int id)
     {
@@ -104,6 +108,7 @@ public class EmployeesController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPost]
     public async Task<ActionResult<EmployeeDto>> CreateEmployee(SaveEmployeeDto dto)
     {
@@ -147,6 +152,7 @@ public class EmployeesController : ControllerBase
         return CreatedAtAction(nameof(GetEmployeeById), new { id = employee.Id }, result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateEmployee(int id, SaveEmployeeDto dto)
     {
@@ -174,6 +180,7 @@ public class EmployeesController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteEmployee(int id)
     {
@@ -200,3 +207,4 @@ public class EmployeesController : ControllerBase
         return NoContent();
     }
 }
+

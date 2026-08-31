@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Skafetin.Shared.DTOs;
 using Skafetin.Shared.Models;
 using Skafetin.Api.Data;
+using Microsoft.AspNetCore.Authorization;
+using Skafetin.Api.Security;
 
 namespace Skafetin.Api.Controllers;
 
@@ -94,6 +96,7 @@ public class LocationsController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPost]
     public async Task<ActionResult<LocationDto>> CreateLocation(SaveLocationDto dto)
     {
@@ -131,6 +134,7 @@ public class LocationsController : ControllerBase
         return CreatedAtAction(nameof(GetLocationById), new { id = location.Id }, result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateLocation(int id, SaveLocationDto dto)
     {
@@ -154,6 +158,7 @@ public class LocationsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteLocation(int id)
     {
