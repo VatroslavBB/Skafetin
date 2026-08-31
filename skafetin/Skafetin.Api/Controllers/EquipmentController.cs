@@ -1,9 +1,11 @@
-﻿using System.Linq.Expressions;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Skafetin.Api.Data;
+using Skafetin.Api.Security;
 using Skafetin.Shared.DTOs;
 using Skafetin.Shared.Models;
+using System.Linq.Expressions;
 
 namespace Skafetin.Api.Controllers;
 
@@ -168,6 +170,7 @@ public class EquipmentController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpPost]
     public async Task<ActionResult<EquipmentDto>> CreateEquipment(SaveEquipmentDto dto)
     {
@@ -208,6 +211,7 @@ public class EquipmentController : ControllerBase
         return CreatedAtAction(nameof(GetEquipmentById), new { id = equipment.Id }, result);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateEquipment(int id, SaveEquipmentDto dto)
     {
@@ -243,6 +247,7 @@ public class EquipmentController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteEquipment(int id)
     {
@@ -285,3 +290,4 @@ public class EquipmentController : ControllerBase
         return null;
     }
 }
+

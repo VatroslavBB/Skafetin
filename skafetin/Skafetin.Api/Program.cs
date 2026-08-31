@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Skafetin.Api.Security;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +47,7 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
     options.AddPolicy(
         AuthorizationPolicies.AdminOnly,
         policy => policy.RequireRole("Admin"));
@@ -58,6 +60,7 @@ builder.Services.AddAuthorization(options =>
         AuthorizationPolicies.InventoryWork,
         policy => policy.RequireRole("Admin", "AssetManager", "LocationResponsible"));
 });
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
