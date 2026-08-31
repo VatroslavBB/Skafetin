@@ -1,3 +1,4 @@
+﻿using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using MudBlazor.Services;
 using Skafetin.App.Components;
 using Skafetin.App.Services;
@@ -16,6 +17,8 @@ builder.Services.AddScoped(sp => new HttpClient
 });
 
 builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped<ProtectedLocalStorage>();
+builder.Services.AddScoped<CurrentUserService>();
 
 var app = builder.Build();
 

@@ -1,0 +1,73 @@
+@page "/login"
+@rendermode InteractiveServer
+@layout Skafetin.App.Components.Layout.MainLayout
+@inject ApiClient Api
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Prijava</PageTitle>
+
+<PageHeader Title="Prijava" Subtitle="Prijavi se svojim korisničkim imenom i lozinkom" />
+
+<MudPaper Class="pa-6" Elevation="0" Style="max-width: 460px;">
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    <EditForm Model="model" OnValidSubmit="SubmitAsync">
+        <DataAnnotationsValidator />
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12">
+                <MudTextField Label="Korisničko ime"
+                              @bind-Value="model.Username"
+                              For="@(() => model.Username)"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField Label="Lozinka"
+                              @bind-Value="model.Password"
+                              For="@(() => model.Password)"
+                              InputType="InputType.Password"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+
+        <div class="d-flex gap-2 mt-6">
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="isSaving">
+                @(isSaving ? "Provjera..." : "Prijavi se")
+            </MudButton>
+        </div>
+    </EditForm>
+</MudPaper>
+
+@code {
+    private LoginRequestDto model = new();
+    private bool isSaving;
+    private string? errorMessage;
+
+    // Metoda se ne smije zvati Login - komponentna klasa već nosi to ime (CS0542).
+    private async Task SubmitAsync()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        var result = await Api.PostAsync<LoginResponseDto>("api/auth/login", model);
+
+        if (result.IsSuccess && result.Data is not null)
+        {
+            await CurrentUser.LoginAsync(result.Data);
+            Snackbar.Add($"Dobrodošli, {result.Data.User.DisplayName}.", Severity.Success);
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        errorMessage = result.ErrorMessage ?? "Prijava nije uspjela.";
+        isSaving = false;
+    }
+}

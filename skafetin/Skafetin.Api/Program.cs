@@ -65,9 +65,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<SkafetinDbContext>();
     await db.Database.MigrateAsync();
 
-    // Svaka Seed*Async metoda sama provjerava je li njezina tablica prazna,
-    // pa se ovo smije zvati uvijek - novi seed se primijeni i na postojeću bazu.
-    await SeedData.SeedAsync(db);
+    var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Seed");
+    await SeedData.SeedAsync(db, seedLogger);
 }
 
 // Configure the HTTP request pipeline.
