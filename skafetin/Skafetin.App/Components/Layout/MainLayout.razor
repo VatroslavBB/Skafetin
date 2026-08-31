@@ -1,5 +1,8 @@
 @inherits LayoutComponentBase
 @using Skafetin.App.Theme
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@implements IDisposable
 
 <MudThemeProvider Theme="SkafetinTheme.Instance" @bind-IsDarkMode="isDarkMode" />
 <MudPopoverProvider />
@@ -13,12 +16,32 @@
         <MudImage Src="skafetin-znak.svg" Height="44" Class="ml-2" Alt="Škafetin" />
         <MudText Typo="Typo.h5" Class="ml-3">Škafetin</MudText>
         <MudSpacer />
-        <MudText Typo="Typo.body2" Class="d-none d-sm-flex">
-            Evidencija imovine Županije
-        </MudText>
         <MudIconButton Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit"
                        OnClick="@(() => isDarkMode = !isDarkMode)" />
+
+        @if (CurrentUser.IsLoggedIn)
+        {
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
+                     AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudText Typo="Typo.body1" Class="px-4 py-2">@CurrentUser.User!.DisplayName</MudText>
+                <MudText Typo="Typo.caption" Class="px-4 pb-2 mud-text-secondary">
+                    @string.Join(", ", CurrentUser.User!.Roles)
+                </MudText>
+                <MudDivider Class="my-1" />
+                <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="LogoutAsync">
+                    Odjava
+                </MudMenuItem>
+            </MudMenu>
+        }
+        else if (CurrentUser.IsInitialized)
+        {
+            <MudButton Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Filled.Login"
+                       OnClick="@(() => Navigation.NavigateTo("/login"))">
+                Prijava
+            </MudButton>
+        }
     </MudAppBar>
 
     <MudDrawer @bind-Open="isDrawerOpen" Elevation="1"
@@ -35,5 +58,27 @@
     private bool isDrawerOpen = true;
     private bool isDarkMode;
 
+    protected override void OnInitialized()
+    {
+        CurrentUser.UserChanged += OnUserChanged;
+    }
+
+    // ProtectedLocalStorage traži JS interop, pa se sesija čita tek nakon prvog rendera.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !CurrentUser.IsInitialized)
+            await CurrentUser.InitializeAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        await CurrentUser.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    private void OnUserChanged() => InvokeAsync(StateHasChanged);
+
     private void ToggleDrawer() => isDrawerOpen = !isDrawerOpen;
+
+    public void Dispose() => CurrentUser.UserChanged -= OnUserChanged;
 }
