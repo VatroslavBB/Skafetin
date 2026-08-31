@@ -83,7 +83,6 @@ public sealed class CurrentUserService
         AccessToken = response.AccessToken;
         ExpiresAtUtc = response.ExpiresAtUtc;
 
-        // HttpClient je Scoped, isti je za cijeli krug, pa zaglavlje vrijedi za sve pozive.
         _http.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", response.AccessToken);
     }
@@ -101,7 +100,7 @@ public sealed class CurrentUserService
         }
         catch
         {
-            // brisanje ne smije srušiti odjavu ako JS interop nije dostupan
+
         }
     }
 }

@@ -1,54 +1,97 @@
-﻿<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
-        Početna
-    </MudNavLink>
+﻿@using Skafetin.App.Services
+@inject CurrentUserService CurrentUser
+@implements IDisposable
 
-    <MudDivider Class="my-2" />
-    <MudText Typo="Typo.caption" Class="px-4">IMOVINA</MudText>
+<MudNavMenu>
+    @if (!CurrentUser.IsLoggedIn)
+    {
+        <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login">
+            Prijava
+        </MudNavLink>
+    }
+    else
+    {
+        <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+            Početna
+        </MudNavLink>
 
-    <MudNavLink Href="/equipment" Icon="@Icons.Material.Filled.Inventory2">
-        Oprema
-    </MudNavLink>
-    <MudNavLink Href="/assignments" Icon="@Icons.Material.Filled.AssignmentTurnedIn" Disabled="true">
-        Zaduženja
-    </MudNavLink>
-    <MudNavLink Href="/inventories" Icon="@Icons.Material.Filled.FactCheck" Disabled="true">
-        Inventure
-    </MudNavLink>
+        @if (CurrentUser.HasAnyRole("Admin", "AssetManager", "LocationResponsible"))
+        {
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Class="px-4">IMOVINA</MudText>
 
-    <MudDivider Class="my-2" />
-    <MudText Typo="Typo.caption" Class="px-4">ZAHTJEVI</MudText>
+            <MudNavLink Href="/equipment" Icon="@Icons.Material.Filled.Inventory2">
+                Oprema
+            </MudNavLink>
+            <MudNavLink Href="/assignments" Icon="@Icons.Material.Filled.AssignmentTurnedIn" Disabled="true">
+                Zaduženja
+            </MudNavLink>
+            <MudNavLink Href="/inventories" Icon="@Icons.Material.Filled.FactCheck" Disabled="true">
+                Inventure
+            </MudNavLink>
 
-    <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail" Disabled="true">
-        Zahtjevi za opremom
-    </MudNavLink>
-    <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep" Disabled="true">
-        Otpis
-    </MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Class="px-4">ZAHTJEVI</MudText>
 
-    <MudDivider Class="my-2" />
-    <MudText Typo="Typo.caption" Class="px-4">ŠIFRARNICI</MudText>
+            <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail" Disabled="true">
+                Zahtjevi za opremom
+            </MudNavLink>
+            <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep" Disabled="true">
+                Otpis
+            </MudNavLink>
+        }
 
-    <MudNavLink Href="/locations" Icon="@Icons.Material.Filled.Place">
-        Lokacije
-    </MudNavLink>
-    <MudNavLink Href="/employees" Icon="@Icons.Material.Filled.Badge">
-        Zaposlenici
-    </MudNavLink>
+        @if (CurrentUser.HasAnyRole("Admin", "AssetManager"))
+        {
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Class="px-4">ŠIFRARNICI</MudText>
 
-    <MudDivider Class="my-2" />
-    <MudText Typo="Typo.caption" Class="px-4">MOJE</MudText>
+            <MudNavLink Href="/locations" Icon="@Icons.Material.Filled.Place">
+                Lokacije
+            </MudNavLink>
+            <MudNavLink Href="/employees" Icon="@Icons.Material.Filled.Badge">
+                Zaposlenici
+            </MudNavLink>
+        }
 
-    <MudNavLink Href="/my-equipment" Icon="@Icons.Material.Filled.Laptop" Disabled="true">
-        Moja oprema
-    </MudNavLink>
-    <MudNavLink Href="/my-requests" Icon="@Icons.Material.Filled.Outbox" Disabled="true">
-        Moji zahtjevi
-    </MudNavLink>
+        <MudDivider Class="my-2" />
+        <MudText Typo="Typo.caption" Class="px-4">MOJE</MudText>
 
-    <MudDivider Class="my-2" />
+        <MudNavLink Href="/my-equipment" Icon="@Icons.Material.Filled.Laptop" Disabled="true">
+            Moja oprema
+        </MudNavLink>
+        <MudNavLink Href="/my-requests" Icon="@Icons.Material.Filled.Outbox" Disabled="true">
+            Moji zahtjevi
+        </MudNavLink>
 
-    <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts" Disabled="true">
-        Korisnici i uloge
-    </MudNavLink>
+
+        @if (CurrentUser.HasRole("Admin"))
+        {
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts" Disabled="true">
+                Korisnici i uloge
+            </MudNavLink>
+        }
+    }
+    
 </MudNavMenu>
+
+
+@code
+{
+    protected override void OnInitialized()
+    {
+        CurrentUser.UserChanged += HandleUserChanged;
+    }
+
+    private void HandleUserChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        CurrentUser.UserChanged -= HandleUserChanged;
+    }
+}
+

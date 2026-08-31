@@ -1,6 +1,38 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+﻿@using Skafetin.App.Services
+@inject CurrentUserService currentUser
+@inject NavigationManager Navigation
+
+@if (!currentUser.IsInitialized)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else
+{
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+
+}
+
+
+@code
+{
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        await currentUser.InitializeAsync();
+        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (!currentUser.IsLoggedIn && !relativePath.StartsWith("login", StringComparison.OrdinalIgnoreCase))
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        StateHasChanged();
+    }
+}

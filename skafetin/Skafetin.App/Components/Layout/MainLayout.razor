@@ -63,13 +63,6 @@
         CurrentUser.UserChanged += OnUserChanged;
     }
 
-    // ProtectedLocalStorage traži JS interop, pa se sesija čita tek nakon prvog rendera.
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && !CurrentUser.IsInitialized)
-            await CurrentUser.InitializeAsync();
-    }
-
     private async Task LogoutAsync()
     {
         await CurrentUser.LogoutAsync();
