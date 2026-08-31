@@ -3,11 +3,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Skafetin.Api.Data;
 public static class SeedData
 {
-    public static async Task SeedAsync(SkafetinDbContext db)
+    public static async Task SeedAsync(SkafetinDbContext db, ILogger? logger = null)
     {
         await SeedLocationsAsync(db);
         await SeedEmployeesAsync(db);
         await SeedEquipmentAsync(db);
+        await AppUserSeeder.SeedAsync(db, logger);
         await db.SaveChangesAsync();
     }
 
