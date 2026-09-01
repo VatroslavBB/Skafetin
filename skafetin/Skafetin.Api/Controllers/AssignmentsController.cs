@@ -15,6 +15,9 @@ public class AssignmentsController: ControllerBase
 {
     private readonly SkafetinDbContext _context;
     private const int AssignmentStatusActive = 1;
+    private const int AssignmentStatusReturned = 2;
+    private const int AssignmentStatusTransfered = 3;
+    private const int AssignmentStatusCanceled = 4;
     private const int EquipmentStatusInStock = 1;
     private const int EquipmentStatusAssigned = 2;
     private const int EquipmentStatusWriteOff = 5;
@@ -186,21 +189,124 @@ public class AssignmentsController: ControllerBase
     [HttpPost("{id:int}/return")]
     public async Task<ActionResult<AssignmentDto>> ReturnAssignment(ReturnAssignmentDto dto, int id)
     {
+        var assignment = await _context.Assignments.FirstOrDefaultAsync(a => a.Id == id);
+        if (assignment is null)
+            return NotFound();
+        if (assignment.AssignmentStatusId != AssignmentStatusActive)
+        {
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Zaduženje nije aktivno."
+            });
+        }
+        if (assignment.AssignedAt > dto.ReturnedAt)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Vrijeme povratka je neispravno."
+            });
 
+        var equipment = await _context.Equipment.FirstAsync(e => e.Id == assignment.EquipmentId);
+        equipment.EquipmentStatusId = EquipmentStatusInStock;
+
+        assignment.ReturnedAt = dto.ReturnedAt;
+        assignment.Note = dto.Note!;
+        assignment.AssignmentStatusId = AssignmentStatusReturned;
+
+        await _context.SaveChangesAsync();
+        var result = await _context.Assignments
+            .Where(a => a.Id == assignment.Id)
+            .Select(ToDto)
+            .FirstAsync();
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.Manage)]
-    [HttpGet("{id:int}/transfer")]
+    [HttpPost("{id:int}/transfer")]
     public async Task<ActionResult<AssignmentDto>> TransferAssignment(TransferAssignmentDto dto, int id)
     {
+        var assignment = await _context.Assignments.FirstOrDefaultAsync(a => a.Id == id);
+        if (assignment is null)
+            return NotFound();
+        if (assignment.AssignmentStatusId != AssignmentStatusActive)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Zaduženje nije aktivno"
+            });
+        var toEmployee = await _context.Employees.FirstOrDefaultAsync(e => e.Id == dto.ToEmployeeId);
+        if (toEmployee is null)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Korisnik na kojeg se prebacuje zaduženje ne postoji."
+            });
+        if (!toEmployee.IsActive)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Zaposlenik na kojeg se prebacuje zaduženje je neaktivan."
+            });
+        var equipment = await _context.Equipment.FirstAsync(e => e.Id == assignment.EquipmentId);
+        if (equipment.EquipmentStatusId == EquipmentStatusWriteOff)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Oprema je otpisana"
+            });
+        if (assignment.EmployeeId == dto.ToEmployeeId)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Trenutni zaposlenik i onaj na kojeg se prebacuje zaduženje su isti."
+            });
+        if (dto.TransferredAt < assignment.AssignedAt)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Datum premještaja kriv.."
+            });
+        if (dto.TransferredAt > DateTime.Now)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Datum premještaja kriv."
+            });
 
+        var newAssignment = new Assignment
+        {
+            EquipmentId = assignment.EquipmentId,
+            EmployeeId = dto.ToEmployeeId,
+            AssignedAt = dto.TransferredAt,
+            AssignmentStatusId = AssignmentStatusActive,
+            PreviousAssignmentId = assignment.Id,
+            Note = dto.Note,
+            CreatedAt = DateTime.Now
+        };
+
+        assignment.AssignmentStatusId = AssignmentStatusTransfered;
+        assignment.ReturnedAt = dto.TransferredAt;
+        _context.Assignments.Add(newAssignment);
+        await _context.SaveChangesAsync();
+        var result = await _context.Assignments
+            .Where(a => a.Id == newAssignment.Id)
+            .Select(ToDto)
+            .FirstAsync();
+        return CreatedAtAction(nameof(GetAssignmentById), 
+            new { id = newAssignment.Id }, result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.Manage)]
-    [HttpGet("{id:int}/cancel")]
+    [HttpPost("{id:int}/cancel")]
     public async Task<IActionResult> CancelAssignment(CancelAssignmentDto dto, int id)
     {
-
+        var assignment = await _context.Assignments.FirstOrDefaultAsync(a => a.Id == id);
+        if (assignment is null)
+            return NotFound();
+        if (assignment.AssignmentStatusId != AssignmentStatusActive)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "zaduženje nije aktivno."
+            });
+        var equipment = await _context.Equipment.FirstAsync(e => e.Id == assignment.EquipmentId);
+        if (equipment.EquipmentStatusId == EquipmentStatusAssigned)
+            equipment.EquipmentStatusId = EquipmentStatusInStock;
+        assignment.AssignmentStatusId = AssignmentStatusCanceled;
+        assignment.ReturnedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+        return NoContent();
     }
 
     public static readonly Expression<Func<Assignment, AssignmentDto>> ToDto = a => new AssignmentDto
@@ -219,16 +325,5 @@ public class AssignmentsController: ControllerBase
         Note = a.Note,
         CreatedAt = a.CreatedAt
     };
-
-    public async Task<string?> ValidateLookupAsync(SaveAssignmentDto dto)
-    {
-        var equipmentIdOk = await _context.EquipmentCategories
-            .AnyAsync(e => e.Id == dto.EquipmentId);
-        var employeeIdOk = await _context.Employees
-            .AnyAsync(e => e.Id == dto.EmployeeId);
-        if (equipmentIdOk && employeeIdOk)
-            return null;
-        return "Zaposlenik ili oprema ne postoje.";
-    }
 }
 
