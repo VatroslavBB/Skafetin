@@ -4,6 +4,8 @@ using Skafetin.Api.Data;
 using Skafetin.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Skafetin.Api.Security;
+using System.Linq.Expressions;
+using Skafetin.Shared.Models;
 
 namespace Skafetin.Api.Controllers;
 
@@ -29,7 +31,46 @@ public class AssignmentsController: ControllerBase
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to)
     {
+        var query = _context.Assignments.AsQueryable();
+        if(!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(a => EF.Functions.Like(a.Equipment!.InventoryNumber, $"%{term}%")
+                                    || EF.Functions.Like(a.Equipment!.Name, $"%{term}%")
+                                    || EF.Functions.Like(a.Employee!.FirstName + " " + a.Employee!.LastName, $"%{term}%"));
+        }
+        if (equipmentId.HasValue)
+        {
+            query = query.Where(a => a.EquipmentId == equipmentId.Value);
+        }
+        if (employeeId.HasValue)
+        {
+            query = query.Where(a => a.EmployeeId == employeeId.Value);
+        }
+        if (statusId.HasValue)
+        {
+            query = query.Where(a => a.AssignmentStatusId == statusId.Value);
+        }
+        if (activeOnly.HasValue)
+        {
+            query = query.Where(a => a.ReturnedAt == null);
+        }
+        if (from.HasValue)
+        {
+            query = query.Where(a => a.AssignedAt >= from.Value);
+        }
+        if (to.HasValue)
+        {
+            query = query.Where(a => a.AssignedAt <= to.Value);
+        }
 
+        var result = await query
+            .OrderByDescending(a => a.AssignedAt)
+            .ThenByDescending(a => a.Id)
+            .Select(ToDto)
+            .ToListAsync();
+
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
@@ -78,5 +119,22 @@ public class AssignmentsController: ControllerBase
     {
 
     }
+
+    public static readonly Expression<Func<Assignment, AssignmentDto>> ToDto = a => new AssignmentDto
+    {
+        Id = a.Id,
+        EquipmentId = a.EquipmentId,
+        InventoryNumber = a.Equipment!.InventoryNumber,
+        EquipmentName = a.Equipment!.Name,
+        EmployeeId = a.EmployeeId,
+        EmployeeFullName = a.Employee!.FirstName + " " + a.Employee!.LastName,
+        AssignedAt = a.AssignedAt,
+        ReturnedAt = a.ReturnedAt,
+        AssignmentStatusId = a.AssignmentStatusId,
+        AssignmentStatusName = a.AssignmentStatus!.Name,
+        PreviousAssignmentId = a.PreviousAssignmentId,
+        Note = a.Note,
+        CreatedAt = a.CreatedAt
+    };
 }
 
