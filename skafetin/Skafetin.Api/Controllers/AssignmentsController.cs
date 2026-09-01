@@ -14,6 +14,10 @@ namespace Skafetin.Api.Controllers;
 public class AssignmentsController: ControllerBase
 {
     private readonly SkafetinDbContext _context;
+    private const int AssignmentStatusActive = 1;
+    private const int EquipmentStatusInStock = 1;
+    private const int EquipmentStatusAssigned = 2;
+    private const int EquipmentStatusWriteOff = 5;
 
     public AssignmentsController(SkafetinDbContext context)
     {
@@ -123,7 +127,59 @@ public class AssignmentsController: ControllerBase
     [HttpPost]
     public async Task<ActionResult<AssignmentDto>> CreateAssignment(SaveAssignmentDto dto)
     {
-        
+        if (dto.AssignedAt > DateTime.Now)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Datum zaduženja pogrešan."
+            });
+        var equipment = await _context.Equipment
+            .FirstOrDefaultAsync(e => e.Id == dto.EquipmentId);
+        if (equipment is null)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Odabrana oprema ne postoji."
+            });
+        if (equipment.EquipmentStatusId == EquipmentStatusWriteOff)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Odabrana oprema je otpisana."
+            });
+        var employee = await _context.Employees
+            .FirstOrDefaultAsync(e => e.Id == dto.EmployeeId);
+        if (employee is null)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Odabrani zaposlenik ne postoji."
+            });
+        var equipmentInUse = await _context.Assignments
+            .AnyAsync(a => a.EquipmentId == dto.EquipmentId);
+        if (equipmentInUse)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Odabrana oprema se već koristi."
+            });
+
+        var assignment = new Assignment
+        {
+            EquipmentId = dto.EquipmentId,
+            EmployeeId = dto.EmployeeId,
+            AssignedAt = dto.AssignedAt,
+            AssignmentStatusId = AssignmentStatusActive,
+            Note = dto.Note?.Trim(),
+            CreatedAt = DateTime.Now
+        };
+
+        _context.Assignments.Add(assignment);
+        equipment.Assignments.Add(assignment);
+        await _context.SaveChangesAsync();
+        var result = await _context.Assignments
+            .Where(a => a.Id == assignment.Id)
+            .Select(ToDto)
+            .FirstAsync();
+        return CreatedAtAction(nameof(GetAssignmentById), new
+        {
+            id = assignment.Id
+        }, result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.Manage)]
