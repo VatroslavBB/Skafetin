@@ -112,13 +112,13 @@ public class AssignmentsController: ControllerBase
     }
 
     [HttpGet("equipment/{equipmentId:int}")]
-    public async Task<ActionResult<List<AssignmentDto>>> GetAssignmentsWithEquipmentId(int id)
+    public async Task<ActionResult<List<AssignmentDto>>> GetAssignmentsByEquipmentId(int equipmentId)
     {
-        var exists = await _context.Equipment.AnyAsync(e => e.Id == id);
+        var exists = await _context.Equipment.AnyAsync(e => e.Id == equipmentId);
         if (!exists)
             return NotFound();
         var result = await _context.Assignments
-            .Where(a => a.EquipmentId == id)
+            .Where(a => a.EquipmentId == equipmentId)
             .OrderByDescending(a => a.AssignedAt)
             .ThenByDescending(a => a.Id)
             .Select(ToDto)
@@ -206,7 +206,8 @@ public class AssignmentsController: ControllerBase
             });
 
         var equipment = await _context.Equipment.FirstAsync(e => e.Id == assignment.EquipmentId);
-        equipment.EquipmentStatusId = EquipmentStatusInStock;
+        if (equipment.EquipmentStatusId == EquipmentStatusAssigned)
+            equipment.EquipmentStatusId = EquipmentStatusInStock;
 
         assignment.ReturnedAt = dto.ReturnedAt;
         assignment.Note = dto.Note!;
