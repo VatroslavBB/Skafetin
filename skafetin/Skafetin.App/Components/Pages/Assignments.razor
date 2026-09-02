@@ -1,0 +1,334 @@
+@page "/assignments"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject CurrentUserService CurrentUser
+
+<PageTitle>Zaduženja</PageTitle>
+
+<PageHeader Title="Zaduženja" Subtitle="Evidencija zaduženja opreme s cjelovitom poviješću">
+    <Actions>
+        @if (canManage)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Navigation.NavigateTo("/assignments/create"))">
+                Novo zaduženje
+            </MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="pa-4 mb-4" Elevation="0">
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" md="3">
+            <MudTextField T="string"
+                          @bind-Value="search"
+                          Label="Pretraga"
+                          Placeholder="Oprema, inventurni broj ili zaposlenik"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="ReloadAsync"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedEmployeeId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Zaposlenik"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var employee in employees)
+                {
+                    <MudSelectItem T="int?" Value="@employee.Id">@employee.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedStatusId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Status"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@status.Id">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudDatePicker Label="Zaduženo od"
+                           @bind-Date="from"
+                           @bind-Date:after="ReloadAsync"
+                           DateFormat="dd.MM.yyyy."
+                           Clearable="true"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudDatePicker Label="Zaduženo do"
+                           @bind-Date="to"
+                           @bind-Date:after="ReloadAsync"
+                           DateFormat="dd.MM.yyyy."
+                           Clearable="true"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="1">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FilterAltOff"
+                       OnClick="ClearFiltersAsync"
+                       FullWidth="true">
+                Očisti
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12">
+            <MudSwitch T="bool"
+                       @bind-Value="activeOnly"
+                       @bind-Value:after="ReloadAsync"
+                       Color="Color.Primary"
+                       Label="Samo aktivna zaduženja" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable T="AssignmentDto"
+              Items="assignments"
+              Hover="true"
+              Striped="true"
+              Elevation="0"
+              Dense="true">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel T="AssignmentDto" SortBy="@(a => a.InventoryNumber)">Inventurni broj</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="AssignmentDto" SortBy="@(a => a.EquipmentName)">Oprema</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="AssignmentDto" SortBy="@(a => a.EmployeeFullName)">Zaposlenik</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="AssignmentDto" SortBy="@(a => a.AssignedAt)" InitialDirection="SortDirection.Descending">Zaduženo</MudTableSortLabel></MudTh>
+            <MudTh>Zatvoreno</MudTh>
+            <MudTh><MudTableSortLabel T="AssignmentDto" SortBy="@(a => a.AssignmentStatusName)">Status</MudTableSortLabel></MudTh>
+            <MudTh Style="width: 170px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Inventurni broj">@context.InventoryNumber</MudTd>
+            <MudTd DataLabel="Oprema">@context.EquipmentName</MudTd>
+            <MudTd DataLabel="Zaposlenik">@context.EmployeeFullName</MudTd>
+            <MudTd DataLabel="Zaduženo">@context.AssignedAt.ToString("dd.MM.yyyy.")</MudTd>
+            <MudTd DataLabel="Zatvoreno">
+                @(context.ReturnedAt.HasValue ? context.ReturnedAt.Value.ToString("dd.MM.yyyy.") : "-")
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@StatusColor(context.AssignmentStatusName)"
+                         Variant="Variant.Text">
+                    @context.AssignmentStatusName
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                               Size="Size.Small"
+                               Title="Profil opreme"
+                               OnClick="@(() => Navigation.NavigateTo($"/equipment/{context.EquipmentId}"))" />
+
+                @if (canManage && IsActive(context))
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.AssignmentReturn"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   Title="Povrat"
+                                   OnClick="@(() => ReturnAsync(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                   Size="Size.Small"
+                                   Color="Color.Info"
+                                   Title="Prijenos"
+                                   OnClick="@(() => TransferAsync(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Block"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   Title="Storniraj"
+                                   OnClick="@(() => CancelAsync(context))" />
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema zaduženja koja odgovaraju filtrima.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Redaka po stranici:"
+                           PageSizeOptions="new[] { 10, 20, 50 }"
+                           InfoFormat="{first_item}-{last_item} od {all_items}" />
+        </PagerContent>
+    </MudTable>
+</LoadingArea>
+
+@code {
+    private List<AssignmentDto> assignments = new();
+    private List<LookupDto> employees = new();
+    private List<LookupDto> statuses = new();
+
+    private string? search;
+    private int? selectedEmployeeId;
+    private int? selectedStatusId;
+    private DateTime? from;
+    private DateTime? to;
+    private bool activeOnly = true;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private bool canManage => CurrentUser.HasAnyRole("Admin", "AssetManager");
+
+    protected override async Task OnInitializedAsync()
+    {
+        employees = await LoadLookupAsync("api/employees/lookup");
+        statuses = await LoadLookupAsync("api/assignmentstatuses");
+        await ReloadAsync();
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task ReloadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (selectedEmployeeId.HasValue)
+            parameters.Add($"employeeId={selectedEmployeeId.Value}");
+
+        if (selectedStatusId.HasValue)
+            parameters.Add($"statusId={selectedStatusId.Value}");
+
+        if (activeOnly)
+            parameters.Add("activeOnly=true");
+
+        if (from.HasValue)
+            parameters.Add($"from={from.Value:yyyy-MM-dd}");
+
+        if (to.HasValue)
+            parameters.Add($"to={to.Value:yyyy-MM-dd}");
+
+        var url = "api/assignments" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : string.Empty);
+
+        var result = await Api.GetAsync<List<AssignmentDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            assignments = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat zaduženja nije uspio.";
+
+        isLoading = false;
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedEmployeeId = null;
+        selectedStatusId = null;
+        from = null;
+        to = null;
+        activeOnly = false;
+        await ReloadAsync();
+    }
+
+    private async Task ReturnAsync(AssignmentDto assignment)
+    {
+        var parameters = new DialogParameters<ReturnAssignmentDialog>
+        {
+            { x => x.Assignment, assignment }
+        };
+
+        var dialog = await DialogService.ShowAsync<ReturnAssignmentDialog>("Povrat opreme", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not ReturnAssignmentDto dto)
+            return;
+
+        var result = await Api.PostAsync<AssignmentDto>($"api/assignments/{assignment.Id}/return", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Oprema je vraćena u skladište.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Povrat nije uspio.", Severity.Error);
+        }
+    }
+
+    private async Task TransferAsync(AssignmentDto assignment)
+    {
+        var parameters = new DialogParameters<TransferAssignmentDialog>
+        {
+            { x => x.Assignment, assignment }
+        };
+
+        var dialog = await DialogService.ShowAsync<TransferAssignmentDialog>("Prijenos zaduženja", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not TransferAssignmentDto dto)
+            return;
+
+        var result = await Api.PostAsync<AssignmentDto>($"api/assignments/{assignment.Id}/transfer", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zaduženje je preneseno.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Prijenos nije uspio.", Severity.Error);
+        }
+    }
+
+    private async Task CancelAsync(AssignmentDto assignment)
+    {
+        var parameters = new DialogParameters<CancelAssignmentDialog>
+        {
+            { x => x.Assignment, assignment }
+        };
+
+        var dialog = await DialogService.ShowAsync<CancelAssignmentDialog>("Storniranje zaduženja", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not CancelAssignmentDto dto)
+            return;
+
+        var result = await Api.PostAsync<bool>($"api/assignments/{assignment.Id}/cancel", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zaduženje je stornirano.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Storniranje nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private static bool IsActive(AssignmentDto assignment) => assignment.ReturnedAt is null;
+
+    private static Color StatusColor(string statusName) => statusName switch
+    {
+        "Aktivno" => Color.Success,
+        "Vraćeno" => Color.Default,
+        "Premješteno" => Color.Info,
+        "Stornirano" => Color.Error,
+        _ => Color.Default
+    };
+}

@@ -1,0 +1,72 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn" Class="mr-2" />
+            Povrat opreme
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Assignment.InventoryNumber - @Assignment.EquipmentName<br />
+            Zaduženo: @Assignment.EmployeeFullName, @Assignment.AssignedAt.ToString("dd.MM.yyyy.")
+        </MudText>
+
+        <MudDatePicker Label="Datum povrata"
+                       @bind-Date="returnedAt"
+                       MinDate="@Assignment.AssignedAt.Date"
+                       MaxDate="DateTime.Today"
+                       DateFormat="dd.MM.yyyy."
+                       Variant="Variant.Outlined"
+                       Class="mb-3" />
+
+        <MudTextField T="string"
+                      Label="Napomena"
+                      @bind-Value="note"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+
+        @if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@validationMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Vrati opremu</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public AssignmentDto Assignment { get; set; } = default!;
+
+    private DateTime? returnedAt = DateTime.Today;
+    private string? note;
+    private string? validationMessage;
+
+    // ReturnAssignmentDto nema DataAnnotations, pa se datum provjerava ovdje.
+    // Api istu provjeru radi neovisno - ovo je samo brža povratna informacija.
+    private void Submit()
+    {
+        if (returnedAt is null)
+        {
+            validationMessage = "Datum povrata je obavezan.";
+            return;
+        }
+
+        if (returnedAt.Value.Date < Assignment.AssignedAt.Date)
+        {
+            validationMessage = "Datum povrata ne može biti prije datuma zaduženja.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new ReturnAssignmentDto
+        {
+            ReturnedAt = returnedAt.Value,
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

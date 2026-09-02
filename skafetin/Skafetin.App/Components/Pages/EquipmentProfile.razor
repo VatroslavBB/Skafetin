@@ -103,14 +103,56 @@
                 </MudTabPanel>
 
                 <MudTabPanel Text="Zaduženja" Icon="@Icons.Material.Filled.AssignmentTurnedIn">
-                    @* Puni se u fazi 7 (feature/assignments), preko GET /api/assignments/equipment/{id}. *@
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                        Zaduženja se prikazuju nakon što se izradi modul zaduženja.
-                    </MudAlert>
+                    
+                    @if (assignmentsError is not null)
+                    {
+                        <MudAlert Severity="Severity.Error">@assignmentsError</MudAlert>
+                    }
+                    else if (assignments.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Ova oprema još nije bila zadužena.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable T="AssignmentDto" Items="assignments" Hover="true" Dense="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Zaposlenik</MudTh>
+                                <MudTh>Zaduženo</MudTh>
+                                <MudTh>Zatvoreno</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Napomena</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Zaposlenik">@context.EmployeeFullName</MudTd>
+                                <MudTd DataLabel="Zaduženo">@context.AssignedAt.ToString("dd.MM.yyyy.")</MudTd>
+                                <MudTd DataLabel="Zatvoreno">
+                                    @(context.ReturnedAt.HasValue ? context.ReturnedAt.Value.ToString("dd.MM.yyyy.") : "-")
+                                </MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string"
+                                             Size="Size.Small"
+                                             Color="@AssignmentStatusColor(context.AssignmentStatusName)"
+                                             Variant="Variant.Text">
+                                        @context.AssignmentStatusName
+                                    </MudChip>
+                                    @if (context.PreviousAssignmentId.HasValue)
+                                    {
+                                        <MudTooltip Text="Nastalo prijenosom s prethodnog zaduženja">
+                                            <MudIcon Icon="@Icons.Material.Filled.SubdirectoryArrowRight"
+                                                     Size="Size.Small"
+                                                     Class="ml-1 mud-text-secondary" />
+                                        </MudTooltip>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Napomena">@Or(context.Note)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
                 </MudTabPanel>
 
                 <MudTabPanel Text="Dokumenti" Icon="@Icons.Material.Filled.AttachFile">
-                    @* Puni se u fazi 11 (feature/equipmentMedia), preko GET /api/equipmentmedia/equipment/{id}. *@
                     <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
                         Slike i dokumenti se prikazuju nakon što se izradi modul datoteka.
                     </MudAlert>
@@ -125,9 +167,11 @@
     [Parameter] public int Id { get; set; }
 
     private EquipmentDetailsDto? equipment;
+    private List<AssignmentDto> assignments = new();
 
     private bool isLoading = true;
     private string? errorMessage;
+    private string? assignmentsError;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -142,7 +186,31 @@
             errorMessage = result.ErrorMessage ?? "Oprema nije pronađena.";
 
         isLoading = false;
+
+        if (equipment is not null)
+            await LoadAssignmentsAsync();
     }
+
+    private async Task LoadAssignmentsAsync()
+    {
+        assignmentsError = null;
+
+        var result = await Api.GetAsync<List<AssignmentDto>>($"api/assignments/equipment/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+            assignments = result.Data;
+        else
+            assignmentsError = result.ErrorMessage ?? "Dohvat povijesti zaduženja nije uspio.";
+    }
+
+    private static Color AssignmentStatusColor(string statusName) => statusName switch
+    {
+        "Aktivno" => Color.Success,
+        "Vraćeno" => Color.Default,
+        "Premješteno" => Color.Info,
+        "Stornirano" => Color.Error,
+        _ => Color.Default
+    };
 
     private async Task DeleteAsync()
     {
