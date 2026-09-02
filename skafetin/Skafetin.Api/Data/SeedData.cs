@@ -8,6 +8,7 @@ public static class SeedData
         await SeedLocationsAsync(db);
         await SeedEmployeesAsync(db);
         await SeedEquipmentAsync(db);
+        await SeedAssignmentsAsync(db);
         await AppUserSeeder.SeedAsync(db, logger);
         await db.SaveChangesAsync();
     }
@@ -67,8 +68,8 @@ public static class SeedData
         // Kategorije i statusi dolaze iz šifrarnika (HasData u SkafetinDbContext):
         // kategorije: 1 Računalna oprema, 2 Mrežna oprema, 3 Namještaj, 4 Alat, 5 Klimatizacija, 6 Medicinska oprema, 7 Ostalo
         // statusi:    1 Na skladištu, 2 Zaduženo, 3 Na servisu, 4 Nedostaje, 5 Otpisano
-        // Komadi sa statusom Zaduženo još nemaju pripadajuće zaduženje jer modul zaduženja
-        // dolazi u fazi 7 - kad se ona napravi, seed zaduženja mora pokriti upravo te komade.
+        // Svaki komad sa statusom Zaduženo dobiva aktivno zaduženje u SeedAssignmentsAsync.
+        // Ako se ovdje doda ili makne komad sa statusom 2, mora se uskladiti i ondje.
 
         db.Equipment.AddRange(
             // Računalna oprema
@@ -132,6 +133,153 @@ public static class SeedData
             new Equipment { InventoryNumber = "INV-0604", Name = "Službeno vozilo Škoda Octavia", Manufacturer = "Škoda", Model = "Octavia 2.0 TDI", EquipmentCategoryId = 7, EquipmentStatusId = 2, LocationId = locations["Županijska uprava"], PurchaseValue = 24900.00m, CreatedAt = new DateTime(2021, 5, 13) }
         );
 
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedAssignmentsAsync(SkafetinDbContext db)
+    {
+        if (await db.Assignments.AnyAsync())
+            return;
+
+        var equipment = await db.Equipment.ToDictionaryAsync(e => e.InventoryNumber, e => e.Id);
+        var employees = await db.Employees.ToDictionaryAsync(emp => emp.Email, emp => emp.Id);
+
+        // Statusi zaduženja (HasData): 1 Aktivno, 2 Vraćeno, 3 Premješteno, 4 Stornirano.
+        const int active = 1;
+        const int returned = 2;
+        const int transferred = 3;
+        const int canceled = 4;
+
+        Assignment New(string inventoryNumber, string email, DateTime assignedAt, int statusId,
+                       DateTime? returnedAt = null, string? note = null, int? previousId = null) =>
+            new()
+            {
+                EquipmentId = equipment[inventoryNumber],
+                EmployeeId = employees[email],
+                AssignedAt = assignedAt,
+                ReturnedAt = returnedAt,
+                AssignmentStatusId = statusId,
+                PreviousAssignmentId = previousId,
+                Note = note,
+                CreatedAt = assignedAt
+            };
+
+        // 1. Aktivna zaduženja - točno jedno za svaki komad sa statusom Zaduženo,
+        //    osim INV-0002 koji aktivno zaduženje dobiva na kraju lanca prijenosa.
+        db.Assignments.AddRange(
+            // Županijska uprava
+            New("INV-0001", "ivana.barisic@skafetin.hr", new DateTime(2025, 1, 13), active),
+            New("INV-0004", "ivana.barisic@skafetin.hr", new DateTime(2024, 9, 2), active),
+            New("INV-0006", "ivana.barisic@skafetin.hr", new DateTime(2025, 1, 13), active, note: "Drugi monitor uz prijenosno računalo."),
+            New("INV-0201", "ivana.barisic@skafetin.hr", new DateTime(2024, 9, 2), active),
+            New("INV-0205", "ivana.barisic@skafetin.hr", new DateTime(2024, 9, 2), active),
+            New("INV-0401", "ivana.barisic@skafetin.hr", new DateTime(2025, 5, 19), active),
+            New("INV-0602", "ivana.barisic@skafetin.hr", new DateTime(2025, 3, 3), active, note: "Zajednička kuhinja, zadužena na pročelnicu."),
+            New("INV-0101", "marko.juric@skafetin.hr", new DateTime(2024, 4, 8), active, note: "Zadužen na voditelja imovine, smješten u serverskoj sobi."),
+            New("INV-0604", "marko.juric@skafetin.hr", new DateTime(2025, 2, 10), active, note: "Službeno vozilo, ključevi i prometna kod voditelja imovine."),
+
+            // Upravni odjel za imovinu
+            New("INV-0009", "petra.kovacevic@skafetin.hr", new DateTime(2024, 10, 14), active),
+            New("INV-0203", "petra.kovacevic@skafetin.hr", new DateTime(2024, 10, 14), active),
+            New("INV-0202", "marko.juric@skafetin.hr", new DateTime(2024, 3, 25), active),
+
+            // OŠ Kamen-Šine
+            New("INV-0012", "josip.matic@skafetin.hr", new DateTime(2025, 9, 8), active, note: "Informatička učionica."),
+            New("INV-0102", "josip.matic@skafetin.hr", new DateTime(2025, 9, 8), active),
+
+            // SŠ Braće Radić
+            New("INV-0008", "maja.saric@skafetin.hr", new DateTime(2025, 4, 7), active),
+            New("INV-0206", "maja.saric@skafetin.hr", new DateTime(2024, 11, 4), active, note: "Zbornica."),
+
+            // Dom zdravlja Solin
+            New("INV-0010", "luka.bilic@skafetin.hr", new DateTime(2024, 12, 2), active),
+            New("INV-0302", "luka.bilic@skafetin.hr", new DateTime(2025, 6, 16), active),
+            New("INV-0402", "luka.bilic@skafetin.hr", new DateTime(2025, 5, 26), active),
+            New("INV-0502", "luka.bilic@skafetin.hr", new DateTime(2024, 8, 19), active, note: "Ordinacija 3."),
+            New("INV-0503", "luka.bilic@skafetin.hr", new DateTime(2024, 8, 19), active, note: "Hodnik uz čekaonicu."),
+
+            // Ambulanta Omiš
+            New("INV-0501", "nikolina.radic@skafetin.hr", new DateTime(2025, 2, 24), active),
+
+            // Dom za starije Trogir
+            New("INV-0104", "damir.lovric@skafetin.hr", new DateTime(2025, 3, 17), active),
+            New("INV-0301", "damir.lovric@skafetin.hr", new DateTime(2025, 1, 20), active),
+            New("INV-0601", "damir.lovric@skafetin.hr", new DateTime(2024, 10, 7), active, note: "Čajna kuhinja prvog kata."),
+            New("INV-0207", "sanja.grubisic@skafetin.hr", new DateTime(2025, 4, 14), active, note: "Soba 12."),
+
+            // 2. Zatvorena zaduženja - oprema je u međuvremenu vraćena, status opreme je Na skladištu.
+            New("INV-0003", "petra.kovacevic@skafetin.hr", new DateTime(2024, 2, 5), returned,
+                returnedAt: new DateTime(2025, 11, 17), note: "Zamijenjeno novijim modelom."),
+            New("INV-0007", "tomislav.vukovic@skafetin.hr", new DateTime(2024, 6, 3), returned,
+                returnedAt: new DateTime(2026, 1, 12)),
+
+            // 3. Stornirano zaduženje - uneseno greškom, zapis ostaje u povijesti (pravilo 13).
+            //    Razlog storna bit će zaseban stupac; do tada stoji u napomeni (docs/07, stavka 1).
+            New("INV-0011", "tomislav.vukovic@skafetin.hr", new DateTime(2025, 10, 6), canceled,
+                returnedAt: new DateTime(2025, 10, 6), note: "Storno: zaduženje uneseno na krivi inventurni broj."),
+
+            // 4. Povijest opreme koja trenutno nije zadužena. Sva ova zaduženja su zatvorena -
+            //    aktivno zaduženje smije imati samo oprema sa statusom Zaduženo.
+
+            // Na skladištu - vraćeno i čeka sljedeće zaduženje
+            New("INV-0103", "marko.juric@skafetin.hr", new DateTime(2024, 4, 2), returned,
+                returnedAt: new DateTime(2025, 10, 20), note: "Zamijenjen novijim uređajem."),
+            New("INV-0204", "tomislav.vukovic@skafetin.hr", new DateTime(2022, 3, 7), returned,
+                returnedAt: new DateTime(2025, 7, 4)),
+            New("INV-0504", "sanja.grubisic@skafetin.hr", new DateTime(2023, 12, 4), returned,
+                returnedAt: new DateTime(2026, 2, 16), note: "Korisnik otpušten iz doma."),
+            New("INV-0603", "petra.kovacevic@skafetin.hr", new DateTime(2024, 7, 1), returned,
+                returnedAt: new DateTime(2025, 9, 15)),
+
+            // Ista oprema zaduživana dvaput - profil opreme pokazuje više redaka
+            New("INV-0303", "damir.lovric@skafetin.hr", new DateTime(2022, 6, 13), returned,
+                returnedAt: new DateTime(2023, 5, 19), note: "Posudba za radove u domu."),
+            New("INV-0303", "luka.bilic@skafetin.hr", new DateTime(2024, 3, 4), returned,
+                returnedAt: new DateTime(2024, 9, 27), note: "Posudba za sanaciju krova."),
+
+            // Na servisu - oprema je vraćena, pa poslana u servis
+            New("INV-0005", "ana.peric@skafetin.hr", new DateTime(2022, 10, 3), returned,
+                returnedAt: new DateTime(2026, 4, 13), note: "Vraćeno jer se ne pokreće, poslano u servis."),
+            New("INV-0106", "ivana.barisic@skafetin.hr", new DateTime(2021, 12, 20), returned,
+                returnedAt: new DateTime(2026, 5, 11), note: "Vraćeno radi zamjene baterije."),
+            New("INV-0305", "josip.matic@skafetin.hr", new DateTime(2022, 5, 9), returned,
+                returnedAt: new DateTime(2026, 3, 2), note: "Vraćeno radi servisa motora."),
+            New("INV-0403", "nikolina.radic@skafetin.hr", new DateTime(2022, 8, 1), returned,
+                returnedAt: new DateTime(2026, 6, 8), note: "Vraćeno, curi kondenzat."),
+
+            // Nedostaje - zadnji poznati korisnik ostaje vidljiv u povijesti
+            New("INV-0013", "maja.saric@skafetin.hr", new DateTime(2024, 10, 7), returned,
+                returnedAt: new DateTime(2026, 1, 26), note: "Nije pronađen na inventuri, evidentirano kao manjak."),
+            New("INV-0304", "damir.lovric@skafetin.hr", new DateTime(2021, 9, 27), returned,
+                returnedAt: new DateTime(2025, 11, 10), note: "Nije pronađena na inventuri 2025."),
+
+            // Otpisano - zaduženja iz radnog vijeka opreme, zapisi ostaju (pravilo 13)
+            New("INV-0014", "ivan.delic@skafetin.hr", new DateTime(2016, 6, 6), returned,
+                returnedAt: new DateTime(2023, 4, 18), note: "Vraćeno pri odlasku zaposlenika, oprema kasnije otpisana."),
+            New("INV-0505", "luka.bilic@skafetin.hr", new DateTime(2017, 3, 20), returned,
+                returnedAt: new DateTime(2024, 5, 7), note: "Istekao vijek trajanja.")
+
+            // INV-0105, INV-0404 i INV-0208 namjerno ostaju bez ijednog zaduženja,
+            // da se na profilu opreme vidi i prazno stanje povijesti.
+        );
+
+        await db.SaveChangesAsync();
+
+        // 5. Lanac prijenosa za INV-0002: tri zapisa, dva Premješteno i jedan aktivan.
+        //    Sprema se u koracima jer PreviousAssignmentId traži Id prethodnog zapisa.
+        var first = New("INV-0002", "marko.juric@skafetin.hr", new DateTime(2024, 1, 15), transferred,
+            returnedAt: new DateTime(2025, 2, 3), note: "Prvo zaduženje nakon nabave.");
+        db.Assignments.Add(first);
+        await db.SaveChangesAsync();
+
+        var second = New("INV-0002", "petra.kovacevic@skafetin.hr", new DateTime(2025, 2, 3), transferred,
+            returnedAt: new DateTime(2025, 12, 9), previousId: first.Id, note: "Preuzeto zbog preraspodjele poslova.");
+        db.Assignments.Add(second);
+        await db.SaveChangesAsync();
+
+        var third = New("INV-0002", "tomislav.vukovic@skafetin.hr", new DateTime(2025, 12, 9), active,
+            previousId: second.Id, note: "Preuzeto za rad u skladištu.");
+        db.Assignments.Add(third);
         await db.SaveChangesAsync();
     }
 }
