@@ -63,7 +63,24 @@ public class InventoriesController: ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<InventoryDetailsDto>> GetInventoryById(int id)
     {
+        var result = await _context.Inventories
+            .Where(i => i.Id == id)
+            .Select(ToInventoryDetailsDto)
+            .FirstOrDefaultAsync();
 
+        if (result is null)
+            return NotFound();
+
+        var ownLocationId = GetRestrictedLocationId();
+        if (ownLocationId.HasValue && result.LocationId != ownLocationId.Value)
+            return Forbid();
+
+        result.Summary = await _context.Inventories
+            .Where(i => i.Id == id)
+            .Select(ToInventorySummaryDto)
+            .FirstAsync();
+
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
@@ -183,6 +200,23 @@ public class InventoriesController: ControllerBase
         WrongLocation = i.InventoryItems.Count(x => x.IsFound == true
                                                  && x.FoundLocationId != null
                                                  && x.FoundLocationId != x.ExpectedLocationId)
+    };
+
+    private static readonly Expression<Func<Inventory, InventoryDetailsDto>> ToInventoryDetailsDto = i => new InventoryDetailsDto
+    {
+        Id = i.Id,
+        Code = i.Code,
+        LocationId = i.LocationId,
+        LocationName = i.Location!.Name,
+        InventoryStatusId = i.InventoryStatusId,
+        InventoryStatusName = i.InventoryStatus!.Name,
+        CreatedByEmployeeId = i.CreatedByEmployeeId,
+        CreatedByEmployeeFullName = i.CreatedByEmployee!.FirstName + " " + i.CreatedByEmployee!.LastName,
+        CreatedAt = i.CreatedAt,
+        StartedAt = i.StartedAt,
+        CompletedAt = i.CompletedAt,
+        LockedAt = i.LockedAt,
+        Note = i.Note
     };
 }
 
