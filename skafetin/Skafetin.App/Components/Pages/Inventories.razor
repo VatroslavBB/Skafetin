@@ -1,0 +1,246 @@
+@page "/inventories"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Inventure</PageTitle>
+
+<PageHeader Title="Inventure" Subtitle="Popis inventura po lokacijama">
+    <Actions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateAsync">
+            Nova inventura
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="pa-4 mb-4" Elevation="0">
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" md="3">
+            <MudTextField T="string"
+                          @bind-Value="search"
+                          Label="Pretraga"
+                          Placeholder="Oznaka, lokacija ili napomena"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="ReloadAsync"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       @bind-Value="selectedLocationId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Lokacija"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var location in locations)
+                {
+                    <MudSelectItem T="int?" Value="@location.Id">@location.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedStatusId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Status"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@status.Id">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudDatePicker Label="Otvorena od"
+                           @bind-Date="from"
+                           @bind-Date:after="ReloadAsync"
+                           DateFormat="dd.MM.yyyy."
+                           Clearable="true"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="1">
+            <MudDatePicker Label="do"
+                           @bind-Date="to"
+                           @bind-Date:after="ReloadAsync"
+                           DateFormat="dd.MM.yyyy."
+                           Clearable="true"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="1">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FilterAltOff"
+                       OnClick="ClearFiltersAsync"
+                       FullWidth="true">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable T="InventoryDto"
+              Items="inventories"
+              Hover="true"
+              Striped="true"
+              Elevation="0"
+              Dense="true"
+              OnRowClick="@(args => OpenDetails(args.Item))"
+              RowStyle="cursor: pointer;">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel T="InventoryDto" SortBy="@(i => i.Code)">Oznaka</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="InventoryDto" SortBy="@(i => i.LocationName)">Lokacija</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="InventoryDto" SortBy="@(i => i.InventoryStatusName)">Status</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="InventoryDto" SortBy="@(i => i.CreatedAt)" InitialDirection="SortDirection.Descending">Otvorena</MudTableSortLabel></MudTh>
+            <MudTh>Otvorio</MudTh>
+            <MudTh Style="width: 60px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Oznaka">@context.Code</MudTd>
+            <MudTd DataLabel="Lokacija">@context.LocationName</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@StatusColor(context.InventoryStatusName)"
+                         Variant="Variant.Text">
+                    @context.InventoryStatusName
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Otvorena">@context.CreatedAt.ToString("dd.MM.yyyy.")</MudTd>
+            <MudTd DataLabel="Otvorio">@context.CreatedByEmployeeFullName</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                               Size="Size.Small"
+                               Title="Otvori inventuru"
+                               OnClick="@(() => OpenDetails(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema inventura koje odgovaraju filtrima.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Redaka po stranici:"
+                           PageSizeOptions="new[] { 10, 20, 50 }"
+                           InfoFormat="{first_item}-{last_item} od {all_items}" />
+        </PagerContent>
+    </MudTable>
+</LoadingArea>
+
+@code {
+    private List<InventoryDto> inventories = new();
+    private List<LookupDto> locations = new();
+    private List<LookupDto> statuses = new();
+
+    private string? search;
+    private int? selectedLocationId;
+    private int? selectedStatusId;
+    private DateTime? from;
+    private DateTime? to;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        locations = await LoadLookupAsync("api/locations/lookup");
+        statuses = await LoadLookupAsync("api/inventorystatuses");
+        await ReloadAsync();
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    // Filtriranje ide na posluzitelju - stranica salje parametre, ne filtrira u pregledniku.
+    private async Task ReloadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (selectedLocationId.HasValue)
+            parameters.Add($"locationId={selectedLocationId.Value}");
+
+        if (selectedStatusId.HasValue)
+            parameters.Add($"statusId={selectedStatusId.Value}");
+
+        if (from.HasValue)
+            parameters.Add($"from={from.Value:yyyy-MM-dd}");
+
+        if (to.HasValue)
+            parameters.Add($"to={to.Value:yyyy-MM-dd}");
+
+        var url = "api/inventories" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : string.Empty);
+
+        var result = await Api.GetAsync<List<InventoryDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            inventories = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat inventura nije uspio.";
+
+        isLoading = false;
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedLocationId = null;
+        selectedStatusId = null;
+        from = null;
+        to = null;
+        await ReloadAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        var parameters = new DialogParameters<CreateInventoryDialog>
+        {
+            { x => x.Locations, locations }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateInventoryDialog>("Nova inventura", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not SaveInventoryDto dto)
+            return;
+
+        var result = await Api.PostAsync<InventoryDto>("api/inventories", dto);
+
+        if (result.IsSuccess && result.Data is not null)
+        {
+            Snackbar.Add("Inventura je stvorena.", Severity.Success);
+            OpenDetails(result.Data);
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Stvaranje inventure nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private void OpenDetails(InventoryDto inventory)
+        => Navigation.NavigateTo($"/inventories/{inventory.Id}");
+
+    private static Color StatusColor(string statusName) => statusName switch
+    {
+        "Skica" => Color.Default,
+        "Otvorena" => Color.Info,
+        "U tijeku" => Color.Warning,
+        "Završena" => Color.Success,
+        "Zaključana" => Color.Dark,
+        _ => Color.Default
+    };
+}

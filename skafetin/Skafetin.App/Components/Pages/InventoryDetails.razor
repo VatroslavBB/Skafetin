@@ -1,0 +1,377 @@
+@page "/inventories/{Id:int}"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject CurrentUserService CurrentUser
+
+<PageTitle>@(inventory?.Code ?? "Inventura")</PageTitle>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    @if (inventory is not null)
+    {
+        <PageHeader Title="@inventory.Code" Subtitle="@($"{inventory.LocationName} · otvorio {inventory.CreatedByEmployeeFullName}")">
+            <Actions>
+                <MudButton Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="@(() => Navigation.NavigateTo("/inventories"))">
+                    Natrag
+                </MudButton>
+
+                @if (inventory.InventoryStatusId == StatusDraft)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               Disabled="isBusy"
+                               OnClick="@(() => TransitionAsync("open", "Inventura je otvorena i stavke su generirane."))">
+                        Otvori popis
+                    </MudButton>
+                }
+
+                @if (inventory.InventoryStatusId == StatusInProgress)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Done"
+                               Disabled="isBusy"
+                               OnClick="@(() => TransitionAsync("complete", "Inventura je završena."))">
+                        Završi
+                    </MudButton>
+                }
+
+                @if (inventory.InventoryStatusId == StatusCompleted && canLock)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Dark"
+                               StartIcon="@Icons.Material.Filled.Lock"
+                               Disabled="isBusy"
+                               OnClick="LockAsync">
+                        Zaključaj
+                    </MudButton>
+                }
+            </Actions>
+        </PageHeader>
+
+        @if (inventory.InventoryStatusId == StatusLocked)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+                Inventura je zaključana @inventory.LockedAt?.ToString("dd.MM.yyyy.") i više se ne može mijenjati.
+            </MudAlert>
+        }
+
+        <MudGrid Spacing="2" Class="mb-4">
+            <MudItem xs="6" md="2">
+                <SummaryCard Label="Ukupno" Value="@inventory.Summary.Total" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <SummaryCard Label="Popisano" Value="@inventory.Summary.Counted" Color="Color.Info" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <SummaryCard Label="Manjak" Value="@inventory.Summary.Missing" Color="Color.Error" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <SummaryCard Label="Oštećeno" Value="@inventory.Summary.Damaged" Color="Color.Warning" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <SummaryCard Label="Krivo mjesto" Value="@inventory.Summary.WrongLocation" Color="Color.Warning" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudPaper Class="pa-3" Elevation="0">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Status</MudText>
+                    <MudText Typo="Typo.h6">@inventory.InventoryStatusName</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Class="pa-4 mb-4" Elevation="0">
+            <MudGrid Spacing="2" Class="align-center">
+                <MudItem xs="12" md="3">
+                    <MudTextField T="string"
+                                  @bind-Value="search"
+                                  Label="Pretraga"
+                                  Placeholder="Naziv ili inventurni broj"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  DebounceInterval="400"
+                                  OnDebounceIntervalElapsed="LoadItemsAsync"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="int?"
+                               @bind-Value="selectedCategoryId"
+                               @bind-Value:after="LoadItemsAsync"
+                               Label="Kategorija"
+                               Clearable="true"
+                               Variant="Variant.Outlined">
+                        @foreach (var category in categories)
+                        {
+                            <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="bool?"
+                               @bind-Value="selectedIsFound"
+                               @bind-Value:after="LoadItemsAsync"
+                               Label="Popisano"
+                               Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="bool?" Value="true">Pronađeno</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="false">Nije pronađeno</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSwitch T="bool"
+                               @bind-Value="onlyDiscrepancies"
+                               @bind-Value:after="LoadItemsAsync"
+                               Color="Color.Warning"
+                               Label="Samo odstupanja" />
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (itemsError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@itemsError</MudAlert>
+        }
+
+        <MudTable T="InventoryItemDto"
+                  Items="items"
+                  Hover="true"
+                  Striped="true"
+                  Elevation="0"
+                  Dense="true"
+                  Loading="isLoadingItems">
+            <HeaderContent>
+                <MudTh>Inventurni broj</MudTh>
+                <MudTh>Oprema</MudTh>
+                <MudTh>Kategorija</MudTh>
+                <MudTh>Očekivano kod</MudTh>
+                <MudTh>Stanje</MudTh>
+                <MudTh>Popisao</MudTh>
+                <MudTh Style="width: 60px;"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Inventurni broj">@context.InventoryNumber</MudTd>
+                <MudTd DataLabel="Oprema">@context.EquipmentName</MudTd>
+                <MudTd DataLabel="Kategorija">@context.EquipmentCategoryName</MudTd>
+                <MudTd DataLabel="Očekivano kod">
+                    @(string.IsNullOrWhiteSpace(context.ExpectedEmployeeFullName) ? "-" : context.ExpectedEmployeeFullName)
+                </MudTd>
+                <MudTd DataLabel="Stanje">
+                    @if (context.IsFound is null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">Nije popisano</MudChip>
+                    }
+                    else if (context.IsFound == false)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text">Manjak</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">Pronađeno</MudChip>
+
+                        @if (context.IsDamaged)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">Oštećeno</MudChip>
+                        }
+
+                        @if (context.FoundLocationId.HasValue && context.FoundLocationId != context.ExpectedLocationId)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">
+                                @context.FoundLocationName
+                            </MudChip>
+                        }
+                    }
+                </MudTd>
+                <MudTd DataLabel="Popisao">
+                    @(string.IsNullOrWhiteSpace(context.CheckedByEmployeeFullName) ? "-" : context.CheckedByEmployeeFullName)
+                </MudTd>
+                <MudTd>
+                    @if (canEditItems)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       Title="Popiši stavku"
+                                       Disabled="isBusy"
+                                       OnClick="@(() => CheckItemAsync(context))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4">
+                    @(inventory.InventoryStatusId == StatusDraft
+                        ? "Stavke nastaju tek kad se inventura otvori."
+                        : "Nema stavaka koje odgovaraju filtrima.")
+                </MudText>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Redaka po stranici:"
+                               PageSizeOptions="new[] { 25, 50, 100 }"
+                               InfoFormat="{first_item}-{last_item} od {all_items}" />
+            </PagerContent>
+        </MudTable>
+    }
+</LoadingArea>
+
+@code {
+    private const int StatusDraft = 1;
+    private const int StatusOpen = 2;
+    private const int StatusInProgress = 3;
+    private const int StatusCompleted = 4;
+    private const int StatusLocked = 5;
+
+    [Parameter] public int Id { get; set; }
+
+    private InventoryDetailsDto? inventory;
+    private List<InventoryItemDto> items = new();
+    private List<LookupDto> categories = new();
+    private List<LookupDto> locations = new();
+
+    private string? search;
+    private int? selectedCategoryId;
+    private bool? selectedIsFound;
+    private bool onlyDiscrepancies;
+
+    private bool isLoading = true;
+    private bool isLoadingItems;
+    private bool isBusy;
+    private string? errorMessage;
+    private string? itemsError;
+
+    private bool canLock => CurrentUser.HasAnyRole("Admin", "AssetManager");
+
+    // Popisivati se smije samo dok je inventura otvorena ili u tijeku (pravilo 11).
+    private bool canEditItems => inventory is not null
+        && (inventory.InventoryStatusId == StatusOpen || inventory.InventoryStatusId == StatusInProgress);
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await LoadLookupAsync("api/equipmentcategories");
+        locations = await LoadLookupAsync("api/locations/lookup");
+        await LoadInventoryAsync();
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task LoadInventoryAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var result = await Api.GetAsync<InventoryDetailsDto>($"api/inventories/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+        {
+            inventory = result.Data;
+            await LoadItemsAsync();
+        }
+        else
+        {
+            errorMessage = result.ErrorMessage ?? "Dohvat inventure nije uspio.";
+        }
+
+        isLoading = false;
+    }
+
+    // Filtri stavaka idu na posluzitelja, ne u preglednik.
+    private async Task LoadItemsAsync()
+    {
+        isLoadingItems = true;
+        itemsError = null;
+
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (onlyDiscrepancies)
+            parameters.Add("onlyDiscrepancies=true");
+
+        if (selectedIsFound.HasValue)
+            parameters.Add($"isFound={selectedIsFound.Value.ToString().ToLowerInvariant()}");
+
+        if (selectedCategoryId.HasValue)
+            parameters.Add($"categoryId={selectedCategoryId.Value}");
+
+        var url = $"api/inventories/{Id}/items" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : string.Empty);
+
+        var result = await Api.GetAsync<List<InventoryItemDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            items = result.Data;
+        else
+            itemsError = result.ErrorMessage ?? "Dohvat stavaka nije uspio.";
+
+        isLoadingItems = false;
+    }
+
+    private async Task CheckItemAsync(InventoryItemDto item)
+    {
+        var parameters = new DialogParameters<CheckInventoryItemDialog>
+        {
+            { x => x.Item, item },
+            { x => x.Locations, locations }
+        };
+
+        var dialog = await DialogService.ShowAsync<CheckInventoryItemDialog>("Popisivanje stavke", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not SaveInventoryItemDto dto)
+            return;
+
+        isBusy = true;
+        var result = await Api.PutAsync<InventoryItemDto>($"api/inventories/{Id}/items/{item.Id}", dto);
+        isBusy = false;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Stavka je popisana.", Severity.Success);
+            // Sazetak i status se mijenjaju s prvom izmjenom, pa se osvjezava cijela inventura.
+            await LoadInventoryAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Spremanje stavke nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private async Task TransitionAsync(string action, string successMessage)
+    {
+        isBusy = true;
+        var result = await Api.PostAsync<InventoryDto>($"api/inventories/{Id}/{action}", new { });
+        isBusy = false;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add(successMessage, Severity.Success);
+            await LoadInventoryAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Radnja nije uspjela.", Severity.Error);
+        }
+    }
+
+    private async Task LockAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            title: "Zaključavanje inventure",
+            message: "Zaključana inventura je konačna i više se ne može mijenjati. Nastaviti?",
+            yesText: "Zaključaj",
+            cancelText: "Odustani");
+
+        if (confirmed != true)
+            return;
+
+        await TransitionAsync("lock", "Inventura je zaključana.");
+    }
+}

@@ -9,6 +9,7 @@ public static class SeedData
         await SeedEmployeesAsync(db);
         await SeedEquipmentAsync(db);
         await SeedAssignmentsAsync(db);
+        await SeedInventoriesAsync(db);
         await AppUserSeeder.SeedAsync(db, logger);
         await db.SaveChangesAsync();
     }
@@ -280,6 +281,131 @@ public static class SeedData
         var third = New("INV-0002", "tomislav.vukovic@skafetin.hr", new DateTime(2025, 12, 9), active,
             previousId: second.Id, note: "Preuzeto za rad u skladištu.");
         db.Assignments.Add(third);
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedInventoriesAsync(SkafetinDbContext db)
+    {
+        if (await db.Inventories.AnyAsync())
+            return;
+
+        var locations = await db.Locations.ToDictionaryAsync(loc => loc.Name, loc => loc.Id);
+        var employees = await db.Employees.ToDictionaryAsync(emp => emp.Email, emp => emp.Id);
+
+        // Statusi inventure (HasData): 1 Skica, 2 Otvorena, 3 U tijeku, 4 Završena, 5 Zaključana.
+        const int draft = 1;
+        const int inProgress = 3;
+        const int locked = 5;
+
+        // Otpisana oprema (status 5) ne ulazi u stavke - isto pravilo kao u InventoriesController.
+        const int writtenOff = 5;
+        const int assignmentActive = 1;
+
+        // Očekivani zaposlenik je onaj koji opremu ima aktivno zaduženu, kao pri /open.
+        var activeAssignments = await db.Assignments
+            .Where(a => a.AssignmentStatusId == assignmentActive)
+            .ToDictionaryAsync(a => a.EquipmentId, a => a.EmployeeId);
+
+        async Task<List<InventoryItem>> ItemsForLocationAsync(int locationId)
+        {
+            var equipment = await db.Equipment
+                .Where(e => e.LocationId == locationId && e.EquipmentStatusId != writtenOff)
+                .OrderBy(e => e.InventoryNumber)
+                .Select(e => new { e.Id, e.InventoryNumber, e.LocationId })
+                .ToListAsync();
+
+            return equipment
+                .Select(e => new InventoryItem
+                {
+                    EquipmentId = e.Id,
+                    ExpectedLocationId = e.LocationId,
+                    ExpectedEmployeeId = activeAssignments.TryGetValue(e.Id, out var employeeId)
+                        ? employeeId
+                        : null,
+                    IsFound = null,
+                    IsDamaged = false
+                })
+                .ToList();
+        }
+
+        var equipmentIdsByNumber = await db.Equipment
+            .ToDictionaryAsync(e => e.InventoryNumber, e => e.Id);
+
+        void Check(List<InventoryItem> items, string inventoryNumber, bool isFound, DateTime checkedAt,
+                   int checkedByEmployeeId, bool isDamaged = false, int? foundLocationId = null, string? note = null)
+        {
+            var item = items.Single(x => x.EquipmentId == equipmentIdsByNumber[inventoryNumber]);
+            item.IsFound = isFound;
+            item.IsDamaged = isDamaged;
+            item.FoundLocationId = isFound ? foundLocationId : null;
+            item.Note = note;
+            item.CheckedAt = checkedAt;
+            item.CheckedByEmployeeId = checkedByEmployeeId;
+        }
+
+        // 1. Zaključana inventura - konačno stanje, služi za provjeru pravila 11 (svaka izmjena vraća 400).
+        //    Manjak INV-0013 objašnjava zašto ta oprema ima status Nedostaje u SeedEquipmentAsync.
+        var majaId = employees["maja.saric@skafetin.hr"];
+        var closedItems = await ItemsForLocationAsync(locations["SŠ Braće Radić"]);
+        Check(closedItems, "INV-0008", true, new DateTime(2026, 1, 22), majaId,
+              foundLocationId: locations["SŠ Braće Radić"]);
+        Check(closedItems, "INV-0013", false, new DateTime(2026, 1, 22), majaId,
+              note: "Nije pronađen ni u zbornici ni u učionici.");
+        Check(closedItems, "INV-0206", true, new DateTime(2026, 1, 23), majaId,
+              foundLocationId: locations["SŠ Braće Radić"]);
+
+        var closed = new Inventory
+        {
+            Code = "INV-2026-001",
+            LocationId = locations["SŠ Braće Radić"],
+            InventoryStatusId = locked,
+            CreatedByEmployeeId = employees["marko.juric@skafetin.hr"],
+            CreatedAt = new DateTime(2026, 1, 20),
+            StartedAt = new DateTime(2026, 1, 21),
+            CompletedAt = new DateTime(2026, 1, 23),
+            LockedAt = new DateTime(2026, 1, 26),
+            Note = "Redovna godišnja inventura.",
+            InventoryItems = closedItems
+        };
+
+        // 2. Inventura u tijeku - dio stavaka popisan, dio još nije. Lokacija je OŠ Kamen-Šine,
+        //    čija je odgovorna osoba ana.peric, pa se na njoj provjerava i pravilo 10 (403).
+        var anaId = employees["ana.peric@skafetin.hr"];
+        var runningItems = await ItemsForLocationAsync(locations["OŠ Kamen-Šine"]);
+        Check(runningItems, "INV-0005", true, new DateTime(2026, 9, 1), anaId,
+              isDamaged: true, foundLocationId: locations["OŠ Kamen-Šine"],
+              note: "Kućište oštećeno, uređaj se ne pokreće.");
+        Check(runningItems, "INV-0012", true, new DateTime(2026, 9, 1), anaId,
+              foundLocationId: locations["OŠ Kamen-Šine"]);
+        Check(runningItems, "INV-0102", true, new DateTime(2026, 9, 2), anaId,
+              foundLocationId: locations["Županijska uprava"],
+              note: "Pronađen u serverskoj sobi županijske uprave.");
+        // INV-0305 namjerno ostaje nepopisan, da se u sažetku vidi razlika Counted / Total.
+
+        var running = new Inventory
+        {
+            Code = "INV-2026-002",
+            LocationId = locations["OŠ Kamen-Šine"],
+            InventoryStatusId = inProgress,
+            CreatedByEmployeeId = anaId,
+            CreatedAt = new DateTime(2026, 8, 28),
+            StartedAt = new DateTime(2026, 8, 31),
+            Note = "Inventura prije početka školske godine.",
+            InventoryItems = runningItems
+        };
+
+        // 3. Skica bez stavaka - stavke nastaju tek pozivom /open (pravilo 12).
+        var draftInventory = new Inventory
+        {
+            Code = "INV-2026-003",
+            LocationId = locations["Dom zdravlja Solin"],
+            InventoryStatusId = draft,
+            CreatedByEmployeeId = employees["marko.juric@skafetin.hr"],
+            CreatedAt = new DateTime(2026, 9, 2),
+            Note = "Priprema za jesensku inventuru."
+        };
+
+        db.Inventories.AddRange(closed, running, draftInventory);
         await db.SaveChangesAsync();
     }
 }
