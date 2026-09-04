@@ -15,7 +15,14 @@ public class InventoriesController: ControllerBase
 {
     private readonly SkafetinDbContext _context;
 
-    public const int InventoryStatusInit = 1;
+    private const int InventoryStatusInit = 1;
+    private const int InventoryStatusOpen = 2;
+    private const int InventoryStatusInProgress = 3;
+    private const int InventoryStatusCompleted = 4;
+    private const int InventoryStatusLocked = 5;
+
+    private const int EquipmentStatusWrittenOff = 5;
+    private const int AssignmentStatusActive = 1;
 
     public InventoriesController(SkafetinDbContext context)
     {
@@ -95,22 +102,23 @@ public class InventoriesController: ControllerBase
         var ownLocationId = GetRestrictedLocationId();
         if (ownLocationId.HasValue && ownLocationId.Value != dto.LocationId)
             return Forbid();
-        var location = await _context.Locations.FirstOrDefaultAsync(l => l.Id == dto.LocationId);
-        if (location is null)
+        var locationExists = await _context.Locations.AnyAsync(l => l.Id == dto.LocationId);
+        if (!locationExists)
             return BadRequest(new ErrorResponseDto
             {
                 Message = "Lokacija ne postoji."
             });
-        var codeExists = await _context.Inventories.AnyAsync(i => i.Code == dto.Code.Trim());
+        var code = dto.Code.Trim();
+        var codeExists = await _context.Inventories.AnyAsync(i => i.Code == code);
         if (codeExists)
             return BadRequest(new ErrorResponseDto
             {
                 Message = "Oznaka već postoji."
             });
-        
+
         var inventory = new Inventory
         {
-            Code = dto.Code.Trim(),
+            Code = code,
             LocationId = dto.LocationId,
             InventoryStatusId = InventoryStatusInit,
             CreatedAt = DateTime.Now,
@@ -133,51 +141,237 @@ public class InventoriesController: ControllerBase
     [HttpPost("{id:int}/open")]
     public async Task<ActionResult<InventoryDto>> OpenInventory(int id)
     {
-        
+        var (inventory, error) = await LoadInventoryAsync(id);
+        if (inventory is null)
+            return error!;
+
+        if (inventory.InventoryStatusId != InventoryStatusInit)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Inventura u krivom stanju"
+            });
+        var equipment = await _context.Equipment
+            .Where(e => e.LocationId == inventory.LocationId
+                     && e.EquipmentStatusId != EquipmentStatusWrittenOff)
+            .Select(e => new { e.Id, e.LocationId })
+            .ToListAsync();
+        var activeAssignments = await _context.Assignments
+            .Where(a => a.AssignmentStatusId == AssignmentStatusActive
+                     && a.Equipment!.LocationId == inventory.LocationId)
+            .Select(a => new { a.EquipmentId, a.EmployeeId })
+            .ToDictionaryAsync(a => a.EquipmentId, a => a.EmployeeId);
+
+        var items = equipment
+            .Select(e => new InventoryItem
+            {
+                InventoryId = inventory.Id,
+                EquipmentId = e.Id,
+                ExpectedLocationId = e.LocationId,
+                ExpectedEmployeeId = activeAssignments.TryGetValue(e.Id, out var expectedEmployeeId)
+                    ? expectedEmployeeId
+                    : null,
+                IsFound = null,
+                IsDamaged = false
+            })
+            .ToList();
+
+        _context.InventoryItems.AddRange(items);
+
+        inventory.InventoryStatusId = InventoryStatusOpen;
+        inventory.StartedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        var result = await _context.Inventories
+            .Where(i => i.Id == inventory.Id)
+            .Select(ToInventoryDto)
+            .FirstAsync();
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
     [HttpPost("{id:int}/complete")]
     public async Task<ActionResult<InventoryDto>> CompleteInventory(int id)
     {
+        var (inventory, error) = await LoadInventoryAsync(id);
+        if (inventory is null)
+            return error!;
 
+        if (inventory.InventoryStatusId != InventoryStatusInProgress)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Inventura u krivom stanju."
+            });
+
+        inventory.InventoryStatusId = InventoryStatusCompleted;
+        inventory.CompletedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        var result = await _context.Inventories
+            .Where(i => i.Id == inventory.Id)
+            .Select(ToInventoryDto)
+            .FirstAsync();
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpPost("{id:int}/lock")]
     public async Task<ActionResult<InventoryDto>> LockInventory(int id)
     {
+        var (inventory, error) = await LoadInventoryAsync(id);
+        if (inventory is null)
+            return error!;
 
+        if (inventory.InventoryStatusId != InventoryStatusCompleted)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Inventura u krivom stanju."
+            });
+
+        inventory.InventoryStatusId = InventoryStatusLocked;
+        inventory.LockedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        var result = await _context.Inventories
+            .Where(i => i.Id == inventory.Id)
+            .Select(ToInventoryDto)
+            .FirstAsync();
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
     [HttpGet("{id:int}/items")]
     public async Task<ActionResult<List<InventoryItemDto>>> GetInventoryItems(
+        int id,
         [FromQuery] string? search,
         [FromQuery] bool? onlyDiscrepancies,
         [FromQuery] bool? isFound,
         [FromQuery] int? categoryId,
-        [FromQuery] int? employeeId,
-        int id)
+        [FromQuery] int? employeeId)
     {
+        var (inventory, error) = await LoadInventoryAsync(id);
+        if (inventory is null)
+            return error!;
 
+        var query = _context.InventoryItems.Where(x => x.InventoryId == id);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(x => EF.Functions.Like(x.Equipment!.Name, $"%{term}%")
+                                  || EF.Functions.Like(x.Equipment!.InventoryNumber, $"%{term}%"));
+        }
+
+        if (onlyDiscrepancies == true)
+            query = query.Where(x => x.IsFound == false
+                                  || x.IsDamaged
+                                  || (x.FoundLocationId != null
+                                   && x.FoundLocationId != x.ExpectedLocationId));
+
+        if (isFound.HasValue)
+            query = query.Where(x => x.IsFound == isFound.Value);
+        if (categoryId.HasValue)
+            query = query.Where(x => x.Equipment!.EquipmentCategoryId == categoryId.Value);
+        if (employeeId.HasValue)
+            query = query.Where(x => x.ExpectedEmployeeId == employeeId.Value);
+
+        var result = await query
+            .OrderBy(x => x.Equipment!.Name)
+            .ThenBy(x => x.Id)
+            .Select(ToInventoryItemDto)
+            .ToListAsync();
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
     [HttpPut("{id:int}/items/{itemId:int}")]
     public async Task<ActionResult<InventoryItemDto>> UpdateInventoryItem(
-        SaveInventoryItemDto dto,
         int id,
-        int itemId)
+        int itemId,
+        SaveInventoryItemDto dto)
     {
+        var claim = User.FindFirst(AppClaimTypes.EmployeeId)?.Value;
+        if (!int.TryParse(claim, out var employeeId))
+            return Forbid();
 
+        var (inventory, error) = await LoadInventoryAsync(id);
+        if (inventory is null)
+            return error!;
+        if (inventory.InventoryStatusId == InventoryStatusLocked)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Inventura je zaključana."
+            });
+
+        if (inventory.InventoryStatusId != InventoryStatusOpen
+            && inventory.InventoryStatusId != InventoryStatusInProgress)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Inventura nije otvorena."
+            });
+
+        var item = await _context.InventoryItems
+            .FirstOrDefaultAsync(x => x.Id == itemId && x.InventoryId == id);
+
+        if (item is null)
+            return NotFound();
+
+        if (dto.FoundLocationId.HasValue)
+        {
+            var locationExists = await _context.Locations.AnyAsync(l => l.Id == dto.FoundLocationId.Value);
+            if (!locationExists)
+                return BadRequest(new ErrorResponseDto
+                {
+                    Message = "Lokacija ne postoji."
+                });
+        }
+
+        item.IsFound = dto.IsFound;
+        item.IsDamaged = dto.IsDamaged;
+        item.FoundLocationId = dto.IsFound ? dto.FoundLocationId : null;
+        item.Note = dto.Note?.Trim();
+        item.CheckedAt = DateTime.Now;
+        item.CheckedByEmployeeId = employeeId;
+
+        if (inventory.InventoryStatusId == InventoryStatusOpen)
+            inventory.InventoryStatusId = InventoryStatusInProgress;
+
+        await _context.SaveChangesAsync();
+
+        var result = await _context.InventoryItems
+            .Where(x => x.Id == item.Id)
+            .Select(ToInventoryItemDto)
+            .FirstAsync();
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
     [HttpGet("{id:int}/summary")]
     public async Task<ActionResult<InventorySummaryDto>> GetInventorySummary(int id)
     {
+        var (inventory, error) = await LoadInventoryAsync(id);
+        if (inventory is null)
+            return error!;
 
+        var result = await _context.Inventories
+            .Where(i => i.Id == id)
+            .Select(ToInventorySummaryDto)
+            .FirstAsync();
+        return Ok(result);
+    }
+
+    private async Task<(Inventory? Inventory, ActionResult? Error)> LoadInventoryAsync(int id)
+    {
+        var inventory = await _context.Inventories.FirstOrDefaultAsync(i => i.Id == id);
+
+        if (inventory is null)
+            return (null, NotFound());
+
+        var ownLocationId = GetRestrictedLocationId();
+        if (ownLocationId.HasValue && ownLocationId.Value != inventory.LocationId)
+            return (null, Forbid());
+
+        return (inventory, null);
     }
 
     private int? GetRestrictedLocationId()
