@@ -15,6 +15,8 @@ public class InventoriesController: ControllerBase
 {
     private readonly SkafetinDbContext _context;
 
+    public const int InventoryStatusInit = 1;
+
     public InventoriesController(SkafetinDbContext context)
     {
         _context = context;
@@ -87,14 +89,51 @@ public class InventoriesController: ControllerBase
     [HttpPost]
     public async Task<ActionResult<InventoryDto>> CreateInventory(SaveInventoryDto dto)
     {
-
+        var claim = User.FindFirst(AppClaimTypes.EmployeeId)?.Value;
+        if (!int.TryParse(claim, out var employeeId))
+            return Forbid();
+        var ownLocationId = GetRestrictedLocationId();
+        if (ownLocationId.HasValue && ownLocationId.Value != dto.LocationId)
+            return Forbid();
+        var location = await _context.Locations.FirstOrDefaultAsync(l => l.Id == dto.LocationId);
+        if (location is null)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Lokacija ne postoji."
+            });
+        var codeExists = await _context.Inventories.AnyAsync(i => i.Code == dto.Code.Trim());
+        if (codeExists)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Oznaka već postoji."
+            });
+        
+        var inventory = new Inventory
+        {
+            Code = dto.Code.Trim(),
+            LocationId = dto.LocationId,
+            InventoryStatusId = InventoryStatusInit,
+            CreatedAt = DateTime.Now,
+            Note = dto.Note,
+            CreatedByEmployeeId = employeeId
+        };
+        _context.Inventories.Add(inventory);
+        await _context.SaveChangesAsync();
+        var result = await _context.Inventories
+            .Where(i => i.Id == inventory.Id)
+            .Select(ToInventoryDto)
+            .FirstAsync();
+        return CreatedAtAction(nameof(GetInventoryById), new
+        {
+            id = inventory.Id
+        }, result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
     [HttpPost("{id:int}/open")]
     public async Task<ActionResult<InventoryDto>> OpenInventory(int id)
     {
-
+        
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
