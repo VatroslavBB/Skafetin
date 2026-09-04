@@ -1,0 +1,88 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Checklist" Class="mr-2" />
+            Popisivanje stavke
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Item.InventoryNumber - @Item.EquipmentName<br />
+            Očekivano: @Item.ExpectedLocationName@(string.IsNullOrWhiteSpace(Item.ExpectedEmployeeFullName)
+                ? string.Empty
+                : $", zaduženo na {Item.ExpectedEmployeeFullName}")
+        </MudText>
+
+        <MudSwitch T="bool"
+                   @bind-Value="isFound"
+                   Color="Color.Primary"
+                   Label="Oprema je pronađena" />
+
+        @if (isFound)
+        {
+            <MudSwitch T="bool"
+                       @bind-Value="isDamaged"
+                       Color="Color.Warning"
+                       Label="Oprema je oštećena"
+                       Class="mb-3" />
+
+            <MudSelect T="int?"
+                       Label="Pronađena lokacija"
+                       @bind-Value="foundLocationId"
+                       Clearable="true"
+                       Variant="Variant.Outlined"
+                       HelperText="Ostavi prazno ako je oprema na očekivanoj lokaciji."
+                       Class="mb-3">
+                @foreach (var location in Locations)
+                {
+                    <MudSelectItem T="int?" Value="@location.Id">@location.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudTextField T="string"
+                      Label="Napomena"
+                      @bind-Value="note"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Spremi</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public InventoryItemDto Item { get; set; } = default!;
+    [Parameter, EditorRequired] public List<LookupDto> Locations { get; set; } = new();
+
+    private bool isFound;
+    private bool isDamaged;
+    private int? foundLocationId;
+    private string? note;
+
+    protected override void OnInitialized()
+    {
+        // Vec popisana stavka se otvara s postojecim vrijednostima; nova krece od "pronadeno".
+        isFound = Item.IsFound ?? true;
+        isDamaged = Item.IsDamaged;
+        foundLocationId = Item.FoundLocationId;
+        note = Item.Note;
+    }
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(new SaveInventoryItemDto
+        {
+            IsFound = isFound,
+            IsDamaged = isFound && isDamaged,
+            // Prazan odabir znaci "na ocekivanoj lokaciji", pa se salje ocekivana.
+            FoundLocationId = isFound ? foundLocationId ?? Item.ExpectedLocationId : null,
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
