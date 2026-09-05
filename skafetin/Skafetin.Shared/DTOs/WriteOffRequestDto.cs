@@ -20,3 +20,4 @@ public class WriteOffRequestDto
     public string? DecisionNote { get; set; }
     public DateTime? ExecutedAt { get; set; }
 }
+
