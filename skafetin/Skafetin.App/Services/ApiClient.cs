@@ -11,7 +11,6 @@ public sealed class ApiClient
     {
         _http = http;
     }
-
     public Task<ApiResult<T>> GetAsync<T>(string url)
         => SendAsync<T>(() => _http.GetAsync(url));
 
@@ -23,6 +22,26 @@ public sealed class ApiClient
 
     public Task<ApiResult<bool>> DeleteAsync(string url)
         => SendAsync<bool>(() => _http.DeleteAsync(url));
+
+    public Task<ApiResult<T>> PostFormAsync<T>(string url, MultipartFormDataContent content)
+        => SendAsync<T>(() => _http.PostAsync(url, content));
+
+    public async Task<ApiResult<byte[]>> GetBytesAsync(string url)
+    {
+        try
+        {
+            var response = await _http.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+                return ApiResult<byte[]>.Fail(await ReadErrorAsync(response));
+
+            return ApiResult<byte[]>.Ok(await response.Content.ReadAsByteArrayAsync());
+        }
+        catch (HttpRequestException)
+        {
+            return ApiResult<byte[]>.Fail("Poslužitelj nije dostupan. Provjeri je li Api projekt pokrenut.");
+        }
+    }
 
     private async Task<ApiResult<T>> SendAsync<T>(Func<Task<HttpResponseMessage>> call)
     {
@@ -71,3 +90,4 @@ public sealed class ApiClient
         };
     }
 }
+
