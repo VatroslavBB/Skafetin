@@ -31,8 +31,8 @@ else
         if (!currentUser.IsLoggedIn && !relativePath.StartsWith("login", StringComparison.OrdinalIgnoreCase))
         {
             Navigation.NavigateTo("/login");
-            return;
         }
         StateHasChanged();
     }
 }
+
