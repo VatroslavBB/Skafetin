@@ -1,0 +1,82 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Outbox" Class="mr-2" />
+            Novi zahtjev za opremom
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="model" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+
+            <MudSelect T="int"
+                       @bind-Value="model.EquipmentCategoryId"
+                       For="@(() => model.EquipmentCategoryId)"
+                       Label="Kategorija opreme"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var category in Categories)
+                {
+                    <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField T="string"
+                          @bind-Value="model.Title"
+                          For="@(() => model.Title)"
+                          Label="Naslov"
+                          MaxLength="150"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField T="string"
+                          @bind-Value="model.Description"
+                          For="@(() => model.Description)"
+                          Label="Obrazloženje"
+                          Lines="4"
+                          MaxLength="1000"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudSelect T="int?"
+                       @bind-Value="model.ReplacementForEquipmentId"
+                       For="@(() => model.ReplacementForEquipmentId)"
+                       Label="Zamjena za opremu"
+                       HelperText="Ostavi prazno ako se traži nova oprema."
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var equipment in MyEquipment)
+                {
+                    <MudSelectItem T="int?" Value="@equipment.Id">@equipment.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <div class="d-flex justify-end gap-2 mt-4">
+                <MudButton OnClick="Cancel">Odustani</MudButton>
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary">
+                    Pošalji zahtjev
+                </MudButton>
+            </div>
+        </EditForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public List<LookupDto> Categories { get; set; } = new();
+    [Parameter] public List<LookupDto> MyEquipment { get; set; } = new();
+
+    private SaveEquipmentRequestDto model = new();
+
+    private void Submit()
+    {
+        model.Title = model.Title.Trim();
+        model.Description = model.Description.Trim();
+        MudDialog.Close(DialogResult.Ok(model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

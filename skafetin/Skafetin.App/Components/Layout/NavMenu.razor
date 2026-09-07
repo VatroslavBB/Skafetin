@@ -33,6 +33,13 @@
             <MudDivider Class="my-2" />
             <MudText Typo="Typo.caption" Class="px-4">ZAHTJEVI</MudText>
 
+            @if (CurrentUser.HasAnyRole("Admin", "AssetManager"))
+            {
+                <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail">
+                    Zahtjevi za opremom
+                </MudNavLink>
+            }
+            <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep" Disabled="true">
             <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail" Disabled="true">
                 Zahtjevi za opremom
             </MudNavLink>
@@ -60,7 +67,7 @@
         <MudNavLink Href="/my-equipment" Icon="@Icons.Material.Filled.Laptop">
             Moja oprema
         </MudNavLink>
-        <MudNavLink Href="/my-requests" Icon="@Icons.Material.Filled.Outbox" Disabled="true">
+        <MudNavLink Href="/my-requests" Icon="@Icons.Material.Filled.Outbox">
             Moji zahtjevi
         </MudNavLink>
 
