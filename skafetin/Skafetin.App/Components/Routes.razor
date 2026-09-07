@@ -1,6 +1,7 @@
 ﻿@using Skafetin.App.Services
 @inject CurrentUserService currentUser
 @inject NavigationManager Navigation
+@implements IDisposable
 
 @if (!currentUser.IsInitialized)
 {
@@ -22,17 +23,36 @@ else
 
 @code
 {
+    private const string LoginPath = "login";
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
         await currentUser.InitializeAsync();
-        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (!currentUser.IsLoggedIn && !relativePath.StartsWith("login", StringComparison.OrdinalIgnoreCase))
-        {
-            Navigation.NavigateTo("/login");
-        }
+        Navigation.LocationChanged += OnLocationChanged;
+        RedirectIfNotLoggedIn();
         StateHasChanged();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        InvokeAsync(RedirectIfNotLoggedIn);
+    }
+
+    private void RedirectIfNotLoggedIn()
+    {
+        if (currentUser.IsLoggedIn)
+            return;
+        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (relativePath.StartsWith(LoginPath, StringComparison.OrdinalIgnoreCase))
+            return;
+        Navigation.NavigateTo("/" + LoginPath);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }
 
