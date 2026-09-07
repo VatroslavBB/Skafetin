@@ -1,4 +1,5 @@
-﻿@using Skafetin.App.Services
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Skafetin.App.Services
 @inject CurrentUserService currentUser
 @inject NavigationManager Navigation
 @implements IDisposable
@@ -13,117 +14,62 @@ else
 {
     <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
         <Found Context="routeData">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    @if (currentUser.IsLoggedIn)
+                    {
+                        <Pages.Forbidden />
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-center pa-8">
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                        </div>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
     </Router>
-
 }
-
 
 @code
 {
     private const string LoginPath = "login";
-    private const string ForbiddenPath = "nema-pristupa";
-
-    private static readonly Dictionary<string, string[]> RouteRoles = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["equipment"] = ["Admin", "AssetManager", "LocationResponsible"],
-        ["equipment/create"] = ["Admin", "AssetManager"],
-        ["equipment/edit"] = ["Admin", "AssetManager"],
-
-        ["assignments"] = ["Admin", "AssetManager", "LocationResponsible"],
-        ["assignments/create"] = ["Admin", "AssetManager"],
-
-        ["inventories"] = ["Admin", "AssetManager", "LocationResponsible"],
-
-        ["equipment-requests"] = ["Admin", "AssetManager"],
-        ["write-off-requests"] = ["Admin", "AssetManager"],
-
-        ["locations"] = ["Admin", "AssetManager"],
-        ["locations/create"] = ["Admin"],
-        ["locations/edit"] = ["Admin"],
-        ["employees"] = ["Admin", "AssetManager"],
-        ["employees/create"] = ["Admin"],
-        ["employees/edit"] = ["Admin"],
-
-        ["users"] = ["Admin"]
-    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
+
         await currentUser.InitializeAsync();
+
         Navigation.LocationChanged += OnLocationChanged;
-        EnforceAccess();
+
+        RedirectIfNotLoggedIn();
+
         StateHasChanged();
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
+        InvokeAsync(RedirectIfNotLoggedIn);
+
+    private void RedirectIfNotLoggedIn()
     {
-        InvokeAsync(EnforceAccess);
-    }
-
-    private void EnforceAccess()
-    {
-        var path = CurrentPath();
-
-        if (!currentUser.IsLoggedIn)
-        {
-            if (!IsSamePath(path, LoginPath))
-                Navigation.NavigateTo("/" + LoginPath);
-
+        if (currentUser.IsLoggedIn)
             return;
-        }
 
-        var requiredRoles = FindRequiredRoles(path);
-
-        if (requiredRoles is not null
-            && !currentUser.HasAnyRole(requiredRoles)
-            && !IsSamePath(path, ForbiddenPath))
-        {
-            Navigation.NavigateTo("/" + ForbiddenPath);
-        }
-    }
-
-    private string CurrentPath()
-    {
         var path = Navigation.ToBaseRelativePath(Navigation.Uri);
 
         var cut = path.IndexOfAny(['?', '#']);
         if (cut >= 0)
             path = path[..cut];
 
-        return path.Trim('/');
+        if (string.Equals(path.Trim('/'), LoginPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Navigation.NavigateTo("/" + LoginPath);
     }
 
-    private static string[]? FindRequiredRoles(string path)
-    {
-        string[]? roles = null;
-        var longest = -1;
-
-        foreach (var rule in RouteRoles)
-        {
-            var isMatch = IsSamePath(path, rule.Key)
-                || path.StartsWith(rule.Key + "/", StringComparison.OrdinalIgnoreCase);
-
-            if (isMatch && rule.Key.Length > longest)
-            {
-                longest = rule.Key.Length;
-                roles = rule.Value;
-            }
-        }
-
-        return roles;
-    }
-
-    private static bool IsSamePath(string path, string route) =>
-        string.Equals(path, route, StringComparison.OrdinalIgnoreCase);
-
-    public void Dispose()
-    {
-        Navigation.LocationChanged -= OnLocationChanged;
-    }
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }
-
