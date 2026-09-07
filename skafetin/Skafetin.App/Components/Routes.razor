@@ -24,6 +24,31 @@ else
 @code
 {
     private const string LoginPath = "login";
+    private const string ForbiddenPath = "nema-pristupa";
+
+    private static readonly Dictionary<string, string[]> RouteRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["equipment"] = ["Admin", "AssetManager", "LocationResponsible"],
+        ["equipment/create"] = ["Admin", "AssetManager"],
+        ["equipment/edit"] = ["Admin", "AssetManager"],
+
+        ["assignments"] = ["Admin", "AssetManager", "LocationResponsible"],
+        ["assignments/create"] = ["Admin", "AssetManager"],
+
+        ["inventories"] = ["Admin", "AssetManager", "LocationResponsible"],
+
+        ["equipment-requests"] = ["Admin", "AssetManager"],
+        ["write-off-requests"] = ["Admin", "AssetManager"],
+
+        ["locations"] = ["Admin", "AssetManager"],
+        ["locations/create"] = ["Admin"],
+        ["locations/edit"] = ["Admin"],
+        ["employees"] = ["Admin", "AssetManager"],
+        ["employees/create"] = ["Admin"],
+        ["employees/edit"] = ["Admin"],
+
+        ["users"] = ["Admin"]
+    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -31,24 +56,70 @@ else
             return;
         await currentUser.InitializeAsync();
         Navigation.LocationChanged += OnLocationChanged;
-        RedirectIfNotLoggedIn();
+        EnforceAccess();
         StateHasChanged();
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        InvokeAsync(RedirectIfNotLoggedIn);
+        InvokeAsync(EnforceAccess);
     }
 
-    private void RedirectIfNotLoggedIn()
+    private void EnforceAccess()
     {
-        if (currentUser.IsLoggedIn)
+        var path = CurrentPath();
+
+        if (!currentUser.IsLoggedIn)
+        {
+            if (!IsSamePath(path, LoginPath))
+                Navigation.NavigateTo("/" + LoginPath);
+
             return;
-        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (relativePath.StartsWith(LoginPath, StringComparison.OrdinalIgnoreCase))
-            return;
-        Navigation.NavigateTo("/" + LoginPath);
+        }
+
+        var requiredRoles = FindRequiredRoles(path);
+
+        if (requiredRoles is not null
+            && !currentUser.HasAnyRole(requiredRoles)
+            && !IsSamePath(path, ForbiddenPath))
+        {
+            Navigation.NavigateTo("/" + ForbiddenPath);
+        }
     }
+
+    private string CurrentPath()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        var cut = path.IndexOfAny(['?', '#']);
+        if (cut >= 0)
+            path = path[..cut];
+
+        return path.Trim('/');
+    }
+
+    private static string[]? FindRequiredRoles(string path)
+    {
+        string[]? roles = null;
+        var longest = -1;
+
+        foreach (var rule in RouteRoles)
+        {
+            var isMatch = IsSamePath(path, rule.Key)
+                || path.StartsWith(rule.Key + "/", StringComparison.OrdinalIgnoreCase);
+
+            if (isMatch && rule.Key.Length > longest)
+            {
+                longest = rule.Key.Length;
+                roles = rule.Value;
+            }
+        }
+
+        return roles;
+    }
+
+    private static bool IsSamePath(string path, string route) =>
+        string.Equals(path, route, StringComparison.OrdinalIgnoreCase);
 
     public void Dispose()
     {

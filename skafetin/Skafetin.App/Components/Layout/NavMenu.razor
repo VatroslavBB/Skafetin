@@ -30,18 +30,18 @@
                 Inventure
             </MudNavLink>
 
-            <MudDivider Class="my-2" />
-            <MudText Typo="Typo.caption" Class="px-4">ZAHTJEVI</MudText>
-
             @if (CurrentUser.HasAnyRole("Admin", "AssetManager"))
             {
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.caption" Class="px-4">ZAHTJEVI</MudText>
+
                 <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail">
                     Zahtjevi za opremom
                 </MudNavLink>
+                <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep">
+                    Otpis
+                </MudNavLink>
             }
-            <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep">
-                Otpis
-            </MudNavLink>
         }
 
         @if (CurrentUser.HasAnyRole("Admin", "AssetManager"))
