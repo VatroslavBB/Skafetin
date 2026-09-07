@@ -15,6 +15,7 @@ public class EquipmentController : ControllerBase
 {
     private const int DefaultPageSize = 20;
     private const int MaxPageSize = 100;
+    private const int EquipmentStatusWriteOff = 5;
 
     private readonly SkafetinDbContext _context;
 
@@ -245,6 +246,45 @@ public class EquipmentController : ControllerBase
         await _context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
+    [HttpPost("{id:int}/move")]
+    public async Task<ActionResult<EquipmentDto>> MoveEquipment(int id, MoveEquipmentDto dto)
+    {
+        var equipment = await _context.Equipment.FindAsync(id);
+
+        if (equipment is null)
+            return NotFound();
+
+        if (equipment.EquipmentStatusId == EquipmentStatusWriteOff)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Otpisana oprema se ne može premjestiti."
+            });
+
+        if (equipment.LocationId == dto.ToLocationId)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Oprema se već nalazi na odabranoj lokaciji."
+            });
+
+        if (!await _context.Locations.AnyAsync(l => l.Id == dto.ToLocationId && l.IsActive))
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Odabrana lokacija ne postoji ili nije aktivna."
+            });
+
+        equipment.LocationId = dto.ToLocationId;
+
+        await _context.SaveChangesAsync();
+
+        var result = await _context.Equipment
+            .Where(e => e.Id == id)
+            .Select(ToDto)
+            .FirstAsync();
+
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.AdminOnly)]

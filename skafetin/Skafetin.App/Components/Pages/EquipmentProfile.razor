@@ -19,6 +19,14 @@
         </MudButton>
         @if (equipment is not null)
         {
+            @if (CanManageMedia)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.MoveDown"
+                           OnClick="MoveAsync">
+                    Premjesti
+                </MudButton>
+            }
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Edit"
@@ -384,6 +392,38 @@
         {
             await LoadAssignmentsAsync();
             await LoadMediaAsync();
+        }
+    }
+
+    private async Task MoveAsync()
+    {
+        if (equipment is null)
+            return;
+
+        var parameters = new DialogParameters<MoveEquipmentDialog>
+        {
+            { x => x.CurrentLocationId, equipment.LocationId },
+            { x => x.CurrentLocationName, equipment.LocationName },
+            { x => x.InventoryNumber, equipment.InventoryNumber },
+            { x => x.EquipmentName, equipment.Name }
+        };
+
+        var dialog = await DialogService.ShowAsync<MoveEquipmentDialog>("Promjena lokacije", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not MoveEquipmentDto dto)
+            return;
+
+        var result = await Api.PostAsync<EquipmentDto>($"api/equipment/{Id}/move", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Lokacija opreme je promijenjena.", Severity.Success);
+            await OnParametersSetAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Promjena lokacije nije uspjela.", Severity.Error);
         }
     }
 
