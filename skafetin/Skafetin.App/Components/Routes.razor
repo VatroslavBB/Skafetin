@@ -1,10 +1,36 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Skafetin.App.Services
 @inject CurrentUserService currentUser
 @inject NavigationManager Navigation
 @implements IDisposable
 
-@if (!currentUser.IsInitialized)
+@if (initializationFailed)
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+        <MudPaper Class="pa-8" Outlined="true" Elevation="0">
+            <div class="d-flex align-center mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Color="Color.Error" Size="Size.Large" Class="mr-3" />
+                <MudText Typo="Typo.h5">Aplikacija se nije uspjela pokrenuti</MudText>
+            </div>
+
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Podaci o prijavi nisu učitani u očekivanom vremenu.
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
+                Pokušaj ponovo, a ako se ponavlja, osvježi stranicu ili se prijavi iznova.
+            </MudText>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="isInitializing"
+                       OnClick="RetryInitializationAsync">
+                Pokušaj ponovo
+            </MudButton>
+        </MudPaper>
+    </MudContainer>
+}
+else if (!currentUser.IsInitialized)
 {
     <div class="d-flex justify-center pa-8">
         <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
@@ -36,18 +62,53 @@ else
 @code
 {
     private const string LoginPath = "login";
+    private static readonly TimeSpan InitializationTimeout = TimeSpan.FromSeconds(10);
+
+    private bool isInitializing;
+    private bool initializationFailed;
+    private bool isSubscribed;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
 
-        await currentUser.InitializeAsync();
+        await InitializeSessionAsync();
+    }
 
-        Navigation.LocationChanged += OnLocationChanged;
+    private async Task RetryInitializationAsync() => await InitializeSessionAsync();
+
+    private async Task InitializeSessionAsync()
+    {
+        if (isInitializing)
+            return;
+
+        isInitializing = true;
+        initializationFailed = false;
+        StateHasChanged();
+
+        try
+        {
+            await currentUser.InitializeAsync().WaitAsync(InitializationTimeout);
+        }
+        catch (Exception)
+        {
+            initializationFailed = true;
+            return;
+        }
+        finally
+        {
+            isInitializing = false;
+            StateHasChanged();
+        }
+
+        if (!isSubscribed)
+        {
+            Navigation.LocationChanged += OnLocationChanged;
+            isSubscribed = true;
+        }
 
         RedirectIfNotLoggedIn();
-
         StateHasChanged();
     }
 
@@ -71,5 +132,9 @@ else
         Navigation.NavigateTo("/" + LoginPath);
     }
 
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        if (isSubscribed)
+            Navigation.LocationChanged -= OnLocationChanged;
+    }
 }
