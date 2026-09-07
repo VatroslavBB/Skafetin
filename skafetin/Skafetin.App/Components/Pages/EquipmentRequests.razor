@@ -1,0 +1,336 @@
+@page "/equipment-requests"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Zahtjevi za opremom</PageTitle>
+
+<PageHeader Title="Zahtjevi za opremom" Subtitle="Obrada zahtjeva zaposlenika za novom ili zamjenskom opremom" />
+
+<MudPaper Class="pa-4 mb-4" Elevation="0">
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" md="3">
+            <MudTextField T="string"
+                          @bind-Value="search"
+                          Label="Pretraga"
+                          Placeholder="Naslov, obrazloženje ili podnositelj"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="ReloadAsync"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedStatusId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Status"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@status.Id">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedCategoryId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Kategorija"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var category in categories)
+                {
+                    <MudSelectItem T="int?" Value="@category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       @bind-Value="selectedEmployeeId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Podnositelj"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var employee in employees)
+                {
+                    <MudSelectItem T="int?" Value="@employee.Id">@employee.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="1">
+            <MudDatePicker Label="Od"
+                           @bind-Date="from"
+                           @bind-Date:after="ReloadAsync"
+                           DateFormat="dd.MM.yyyy."
+                           Clearable="true"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="6" md="1">
+            <MudDatePicker Label="Do"
+                           @bind-Date="to"
+                           @bind-Date:after="ReloadAsync"
+                           DateFormat="dd.MM.yyyy."
+                           Clearable="true"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="1">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FilterAltOff"
+                       OnClick="ClearFiltersAsync"
+                       FullWidth="true">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable T="EquipmentRequestDto"
+              Items="requests"
+              Hover="true"
+              Striped="true"
+              Elevation="0"
+              Dense="true">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel T="EquipmentRequestDto" SortBy="@(r => r.CreatedAt)" InitialDirection="SortDirection.Descending">Zaprimljeno</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="EquipmentRequestDto" SortBy="@(r => r.Title)">Naslov</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="EquipmentRequestDto" SortBy="@(r => r.RequestedByEmployeeFullName)">Podnositelj</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="EquipmentRequestDto" SortBy="@(r => r.EquipmentCategoryName)">Kategorija</MudTableSortLabel></MudTh>
+            <MudTh>Zamjena za</MudTh>
+            <MudTh><MudTableSortLabel T="EquipmentRequestDto" SortBy="@(r => r.RequestStatusName)">Status</MudTableSortLabel></MudTh>
+            <MudTh>Dodijeljeno</MudTh>
+            <MudTh Style="width: 110px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Zaprimljeno">@context.CreatedAt.ToString("dd.MM.yyyy.")</MudTd>
+            <MudTd DataLabel="Naslov">
+                @context.Title
+                @if (!string.IsNullOrWhiteSpace(context.DecisionNote))
+                {
+                    <MudTooltip Text="@context.DecisionNote">
+                        <MudIcon Icon="@Icons.Material.Filled.Comment" Size="Size.Small" Class="ml-1" />
+                    </MudTooltip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Podnositelj">@context.RequestedByEmployeeFullName</MudTd>
+            <MudTd DataLabel="Kategorija">@context.EquipmentCategoryName</MudTd>
+            <MudTd DataLabel="Zamjena za">@(context.ReplacementForEquipmentInventoryNumber ?? "-")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@StatusColor(context.RequestStatusId)"
+                         Variant="Variant.Text">
+                    @context.RequestStatusName
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Dodijeljeno">@(context.ResultingEquipmentInventoryNumber ?? "-")</MudTd>
+            <MudTd>
+                @if (AllowedNextStatuses(context.RequestStatusId).Count > 0)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.RuleFolder"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   Title="Obradi"
+                                   OnClick="@(() => ProcessAsync(context))" />
+                }
+                @if (context.RequestStatusId == RequestStatusApproved)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Inventory"
+                                   Size="Size.Small"
+                                   Color="Color.Success"
+                                   Title="Realiziraj"
+                                   OnClick="@(() => FulfillAsync(context))" />
+                }
+                @if (context.ResultingEquipmentId.HasValue)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                   Size="Size.Small"
+                                   Title="Profil dodijeljene opreme"
+                                   OnClick="@(() => Navigation.NavigateTo($"/equipment/{context.ResultingEquipmentId!.Value}"))" />
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema zahtjeva koji odgovaraju filtrima.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Redaka po stranici:"
+                           PageSizeOptions="new[] { 10, 20, 50 }"
+                           InfoFormat="{first_item}-{last_item} od {all_items}" />
+        </PagerContent>
+    </MudTable>
+</LoadingArea>
+
+@code {
+    private const int RequestStatusReceived = 1;
+    private const int RequestStatusInProgress = 2;
+    private const int RequestStatusApproved = 3;
+    private const int RequestStatusRejected = 4;
+    private const int RequestStatusFulfilled = 5;
+    private const int RequestStatusClosed = 6;
+
+    private List<EquipmentRequestDto> requests = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> categories = new();
+    private List<LookupDto> employees = new();
+
+    private string? search;
+    private int? selectedStatusId;
+    private int? selectedCategoryId;
+    private int? selectedEmployeeId;
+    private DateTime? from;
+    private DateTime? to;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        statuses = await LoadLookupAsync("api/requeststatuses");
+        categories = await LoadLookupAsync("api/equipmentcategories");
+        employees = await LoadLookupAsync("api/employees/lookup");
+        await ReloadAsync();
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task ReloadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (selectedStatusId.HasValue)
+            parameters.Add($"statusId={selectedStatusId.Value}");
+
+        if (selectedCategoryId.HasValue)
+            parameters.Add($"categoryId={selectedCategoryId.Value}");
+
+        if (selectedEmployeeId.HasValue)
+            parameters.Add($"employeeId={selectedEmployeeId.Value}");
+
+        if (from.HasValue)
+            parameters.Add($"from={from.Value:yyyy-MM-dd}");
+
+        if (to.HasValue)
+            parameters.Add($"to={to.Value:yyyy-MM-dd}");
+
+        var url = "api/equipmentrequests" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : string.Empty);
+
+        var result = await Api.GetAsync<List<EquipmentRequestDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            requests = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat zahtjeva nije uspio.";
+
+        isLoading = false;
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedStatusId = null;
+        selectedCategoryId = null;
+        selectedEmployeeId = null;
+        from = null;
+        to = null;
+        await ReloadAsync();
+    }
+
+    private async Task ProcessAsync(EquipmentRequestDto request)
+    {
+        var parameters = new DialogParameters<ProcessRequestDialog>
+        {
+            { x => x.Request, request },
+            { x => x.AllowedStatuses, AllowedNextStatuses(request.RequestStatusId) }
+        };
+
+        var dialog = await DialogService.ShowAsync<ProcessRequestDialog>("Obrada zahtjeva", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not ProcessRequestDto dto)
+            return;
+
+        var result = await Api.PostAsync<EquipmentRequestDto>($"api/equipmentrequests/{request.Id}/process", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zahtjev je obrađen.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Obrada zahtjeva nije uspjela.", Severity.Error);
+        }
+    }
+
+    private async Task FulfillAsync(EquipmentRequestDto request)
+    {
+        var availableEquipment = await LoadLookupAsync("api/equipment/lookup?availableOnly=true");
+
+        var parameters = new DialogParameters<FulfillRequestDialog>
+        {
+            { x => x.Request, request },
+            { x => x.Equipment, availableEquipment }
+        };
+
+        var dialog = await DialogService.ShowAsync<FulfillRequestDialog>("Realizacija zahtjeva", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not FulfillRequestDto dto)
+            return;
+
+        var result = await Api.PostAsync<EquipmentRequestDto>($"api/equipmentrequests/{request.Id}/fulfill", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zahtjev je realiziran.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Realizacija nije uspjela.", Severity.Error);
+        }
+    }
+
+    // Ista pravila prijelaza kao u EquipmentRequestsController.IsAllowedTransition.
+    // Realizirano se ne nudi ovdje jer ga postavlja samo /fulfill.
+    private List<LookupDto> AllowedNextStatuses(int currentStatusId)
+    {
+        var allowedIds = currentStatusId switch
+        {
+            RequestStatusReceived => new[] { RequestStatusInProgress },
+            RequestStatusInProgress => new[] { RequestStatusApproved, RequestStatusRejected },
+            RequestStatusRejected => new[] { RequestStatusClosed },
+            RequestStatusFulfilled => new[] { RequestStatusClosed },
+            _ => Array.Empty<int>()
+        };
+
+        return statuses.Where(s => allowedIds.Contains(s.Id)).ToList();
+    }
+
+    private static Color StatusColor(int statusId) => statusId switch
+    {
+        RequestStatusReceived => Color.Default,
+        RequestStatusInProgress => Color.Info,
+        RequestStatusApproved => Color.Success,
+        RequestStatusRejected => Color.Error,
+        RequestStatusFulfilled => Color.Primary,
+        RequestStatusClosed => Color.Dark,
+        _ => Color.Default
+    };
+}
