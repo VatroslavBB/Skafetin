@@ -172,8 +172,9 @@ public class AssignmentsController: ControllerBase
             CreatedAt = DateTime.Now
         };
 
+        equipment.EquipmentStatusId = EquipmentStatusAssigned;
+
         _context.Assignments.Add(assignment);
-        equipment.Assignments.Add(assignment);
         await _context.SaveChangesAsync();
         var result = await _context.Assignments
             .Where(a => a.Id == assignment.Id)
@@ -279,6 +280,8 @@ public class AssignmentsController: ControllerBase
 
         assignment.AssignmentStatusId = AssignmentStatusTransfered;
         assignment.ReturnedAt = dto.TransferredAt;
+        equipment.EquipmentStatusId = EquipmentStatusAssigned;
+
         _context.Assignments.Add(newAssignment);
         await _context.SaveChangesAsync();
         var result = await _context.Assignments
