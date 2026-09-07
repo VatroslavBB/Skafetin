@@ -1,0 +1,62 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.DeleteSweep" Class="mr-2" />
+            Novi zahtjev za otpisom
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            Zahtjev se podnosi za jedan komad opreme. Otpis se provodi tek nakon odobrenja.
+        </MudText>
+
+        <EditForm Model="model" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+
+            <MudSelect T="int"
+                       Label="Oprema"
+                       @bind-Value="model.EquipmentId"
+                       For="@(() => model.EquipmentId)"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var equipment in Equipment)
+                {
+                    <MudSelectItem T="int" Value="@equipment.Id">@equipment.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField T="string"
+                          Label="Obrazloženje"
+                          @bind-Value="model.Reason"
+                          For="@(() => model.Reason)"
+                          Placeholder="Zašto oprema više nije upotrebljiva"
+                          Lines="4"
+                          Variant="Variant.Outlined" />
+
+            <div class="d-flex justify-end gap-2 mt-4">
+                <MudButton OnClick="Cancel">Odustani</MudButton>
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary">
+                    Pošalji
+                </MudButton>
+            </div>
+        </EditForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public List<LookupDto> Equipment { get; set; } = new();
+
+    private SaveWriteOffRequestDto model = new();
+
+    private void Submit()
+    {
+        model.Reason = model.Reason.Trim();
+        MudDialog.Close(DialogResult.Ok(model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
