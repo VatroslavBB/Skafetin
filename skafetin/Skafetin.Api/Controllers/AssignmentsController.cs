@@ -154,12 +154,12 @@ public class AssignmentsController: ControllerBase
             {
                 Message = "Odabrani zaposlenik ne postoji."
             });
-        var equipmentInUse = await _context.Assignments
-            .AnyAsync(a => a.EquipmentId == dto.EquipmentId);
-        if (equipmentInUse)
+        var hasActiveAssignment = await _context.Assignments
+            .AnyAsync(a => a.EquipmentId == dto.EquipmentId && a.ReturnedAt == null);
+        if (hasActiveAssignment)
             return BadRequest(new ErrorResponseDto
             {
-                Message = "Odabrana oprema se već koristi."
+                Message = "Odabrana oprema već ima aktivno zaduženje."
             });
 
         var assignment = new Assignment
