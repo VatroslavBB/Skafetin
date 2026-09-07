@@ -4,6 +4,8 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject CurrentUserService CurrentUser
+@inject IJSRuntime JS
 
 <PageTitle>@(equipment?.Name ?? "Oprema")</PageTitle>
 
@@ -153,9 +155,168 @@
                 </MudTabPanel>
 
                 <MudTabPanel Text="Dokumenti" Icon="@Icons.Material.Filled.AttachFile">
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                        Slike i dokumenti se prikazuju nakon što se izradi modul datoteka.
-                    </MudAlert>
+
+                    @if (CanManageMedia)
+                    {
+                        <MudPaper Class="pa-4 mb-4" Outlined="true" Elevation="0">
+                            <MudGrid Spacing="2" Class="align-center">
+                                <MudItem xs="12" md="3">
+                                    <MudFileUpload T="IBrowserFile"
+                                                   FilesChanged="OnFileChanged"
+                                                   Accept="image/jpeg,image/png,image/webp,application/pdf">
+                                        <ActivatorContent>
+                                            <MudButton Variant="Variant.Outlined"
+                                                       StartIcon="@Icons.Material.Filled.UploadFile">
+                                                Odaberi datoteku
+                                            </MudButton>
+                                        </ActivatorContent>
+                                    </MudFileUpload>
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField @bind-Value="uploadTitle"
+                                                  Label="Naslov"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  MaxLength="150" />
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudSelect @bind-Value="uploadKind"
+                                               Label="Vrsta"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense">
+                                        <MudSelectItem Value="@("Image")">Slika</MudSelectItem>
+                                        <MudSelectItem Value="@("Document")">Dokument</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" md="2">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               FullWidth="true"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               Disabled="@(selectedFile is null || isUploading)"
+                                               OnClick="UploadAsync">
+                                        @(isUploading ? "Prilažem..." : "Priloži")
+                                    </MudButton>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @if (selectedFile is not null)
+                                        {
+                                            <b>@selectedFile.Name</b>
+                                            <span> (@FormatSize(selectedFile.Size))</span>
+                                            <span> &middot; </span>
+                                        }
+                                        <span>Slike JPG, PNG i WEBP do 5 MB; dokumenti PDF do 10 MB.</span>
+                                    </MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+
+                    @if (mediaError is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-4">@mediaError</MudAlert>
+                    }
+
+                    @if (isMediaLoading)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    }
+                    else if (media.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Uz ovu opremu još nema priloženih datoteka.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        @if (Images.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Slike</MudText>
+                            <MudGrid Spacing="3" Class="mb-4">
+                                @foreach (var item in Images)
+                                {
+                                    <MudItem xs="12" sm="6" md="4" lg="3">
+                                        <MudCard Outlined="true" Elevation="0">
+                                            @if (previews.TryGetValue(item.Id, out var dataUrl))
+                                            {
+                                                <MudCardMedia Image="@dataUrl" Height="160" />
+                                            }
+                                            else
+                                            {
+                                                <div style="height:160px;" class="d-flex align-center justify-center">
+                                                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                                                </div>
+                                            }
+                                            <MudCardContent Class="py-2">
+                                                <MudText Typo="Typo.body2"><b>@item.Title</b></MudText>
+                                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                    @item.OriginalFileName &middot; @FormatSize(item.FileSize)
+                                                </MudText>
+                                            </MudCardContent>
+                                            <MudCardActions>
+                                                <MudButton Size="Size.Small"
+                                                           StartIcon="@Icons.Material.Filled.OpenInNew"
+                                                           OnClick="@(() => OpenAsync(item))">
+                                                    Otvori
+                                                </MudButton>
+                                                @if (CanManageMedia)
+                                                {
+                                                    <MudSpacer />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Disabled="@(busyMediaId == item.Id)"
+                                                                   OnClick="@(() => DeleteMediaAsync(item))" />
+                                                }
+                                            </MudCardActions>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        }
+
+                        @if (Documents.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Dokumenti</MudText>
+                            <MudTable T="EquipmentMediaDto" Items="Documents" Hover="true" Dense="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Naslov</MudTh>
+                                    <MudTh>Datoteka</MudTh>
+                                    <MudTh>Veličina</MudTh>
+                                    <MudTh>Priloženo</MudTh>
+                                    <MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Naslov">@context.Title</MudTd>
+                                    <MudTd DataLabel="Datoteka">@context.OriginalFileName</MudTd>
+                                    <MudTd DataLabel="Veličina">@FormatSize(context.FileSize)</MudTd>
+                                    <MudTd DataLabel="Priloženo">
+                                        @context.UploadedAt.ToLocalTime().ToString("dd.MM.yyyy.")
+                                        @if (!string.IsNullOrWhiteSpace(context.UploadedByEmployeeFullName))
+                                        {
+                                            <span class="mud-text-secondary"> &middot; @context.UploadedByEmployeeFullName</span>
+                                        }
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudButton Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                                                   OnClick="@(() => OpenAsync(context))">
+                                            Otvori
+                                        </MudButton>
+                                        @if (CanManageMedia)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                           Color="Color.Error"
+                                                           Size="Size.Small"
+                                                           Disabled="@(busyMediaId == context.Id)"
+                                                           OnClick="@(() => DeleteMediaAsync(context))" />
+                                        }
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    }
                 </MudTabPanel>
 
             </MudTabs>
@@ -173,6 +334,37 @@
     private string? errorMessage;
     private string? assignmentsError;
 
+    private const long MaxImageSize = 5 * 1024 * 1024;
+    private const long MaxDocumentSize = 10 * 1024 * 1024;
+
+    private static readonly Dictionary<string, string> AllowedContentTypes = new()
+    {
+        ["image/jpeg"] = "Image",
+        ["image/png"] = "Image",
+        ["image/webp"] = "Image",
+        ["application/pdf"] = "Document"
+    };
+
+    private List<EquipmentMediaDto> media = new();
+    private readonly Dictionary<int, string> previews = new();
+
+    private bool isMediaLoading;
+    private string? mediaError;
+
+    private IBrowserFile? selectedFile;
+    private string uploadTitle = string.Empty;
+    private string uploadKind = "Image";
+    private bool isUploading;
+    private int? busyMediaId;
+
+    private bool CanManageMedia => CurrentUser.HasAnyRole("Admin", "AssetManager");
+
+    private List<EquipmentMediaDto> Images =>
+        media.Where(m => m.MediaKind == "Image").ToList();
+
+    private List<EquipmentMediaDto> Documents =>
+        media.Where(m => m.MediaKind == "Document").ToList();
+
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
@@ -188,7 +380,170 @@
         isLoading = false;
 
         if (equipment is not null)
+        {
             await LoadAssignmentsAsync();
+            await LoadMediaAsync();
+        }
+    }
+
+    private async Task LoadMediaAsync()
+    {
+        isMediaLoading = true;
+        mediaError = null;
+        previews.Clear();
+
+        var result = await Api.GetAsync<List<EquipmentMediaDto>>($"api/equipmentmedia/equipment/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+            media = result.Data;
+        else
+            mediaError = result.ErrorMessage ?? "Dohvat priloženih datoteka nije uspio.";
+
+        isMediaLoading = false;
+
+        foreach (var image in Images)
+            await LoadPreviewAsync(image);
+    }
+
+    private async Task LoadPreviewAsync(EquipmentMediaDto item)
+    {
+        if (previews.ContainsKey(item.Id))
+            return;
+
+        var result = await Api.GetBytesAsync($"api/equipmentmedia/{item.Id}/content");
+
+        if (result.IsSuccess && result.Data is not null)
+        {
+            previews[item.Id] = $"data:{item.ContentType};base64,{Convert.ToBase64String(result.Data)}";
+            StateHasChanged();
+        }
+    }
+
+    private void OnFileChanged(IBrowserFile? file)
+    {
+        selectedFile = file;
+
+        if (file is null)
+            return;
+
+        if (AllowedContentTypes.TryGetValue(file.ContentType, out var kind))
+            uploadKind = kind;
+
+        if (string.IsNullOrWhiteSpace(uploadTitle))
+            uploadTitle = Path.GetFileNameWithoutExtension(file.Name);
+    }
+
+    private async Task UploadAsync()
+    {
+        if (selectedFile is null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(uploadTitle))
+        {
+            Snackbar.Add("Upiši naslov datoteke.", Severity.Warning);
+            return;
+        }
+
+        if (!AllowedContentTypes.TryGetValue(selectedFile.ContentType, out var kind))
+        {
+            Snackbar.Add("Dopuštene su slike (JPG, PNG, WEBP) i PDF dokumenti.", Severity.Warning);
+            return;
+        }
+
+        var maxSize = kind == "Image" ? MaxImageSize : MaxDocumentSize;
+
+        if (selectedFile.Size > maxSize)
+        {
+            Snackbar.Add(
+                kind == "Image"
+                    ? "Slika smije imati najviše 5 MB."
+                    : "Dokument smije imati najviše 10 MB.",
+                Severity.Warning);
+            return;
+        }
+
+        isUploading = true;
+
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            await using var stream = selectedFile.OpenReadStream(maxSize);
+            using var fileContent = new StreamContent(stream);
+
+            fileContent.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue(selectedFile.ContentType);
+
+            form.Add(fileContent, "file", selectedFile.Name);
+            form.Add(new StringContent(uploadTitle.Trim()), "title");
+            form.Add(new StringContent(uploadKind), "kind");
+
+            var result = await Api.PostFormAsync<EquipmentMediaDto>(
+                $"api/equipmentmedia/equipment/{Id}",
+                form);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add("Datoteka je priložena.", Severity.Success);
+                selectedFile = null;
+                uploadTitle = string.Empty;
+                await LoadMediaAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Prilaganje datoteke nije uspjelo.", Severity.Error);
+            }
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task OpenAsync(EquipmentMediaDto item)
+    {
+        var result = await Api.GetBytesAsync($"api/equipmentmedia/{item.Id}/content");
+
+        if (!result.IsSuccess || result.Data is null)
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Datoteka nije dostupna.", Severity.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync(
+            "skafetinFiles.open",
+            Convert.ToBase64String(result.Data),
+            item.ContentType,
+            item.OriginalFileName);
+    }
+
+    private async Task DeleteMediaAsync(EquipmentMediaDto item)
+    {
+        if (!await DialogService.ConfirmDeleteAsync($"Datoteka \"{item.Title}\""))
+            return;
+
+        busyMediaId = item.Id;
+
+        var result = await Api.DeleteAsync($"api/equipmentmedia/{item.Id}");
+
+        busyMediaId = null;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Datoteka je obrisana.", Severity.Success);
+            await LoadMediaAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Brisanje nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+            return $"{bytes / 1024d / 1024d:N1} MB";
+
+        return $"{bytes / 1024d:N0} KB";
     }
 
     private async Task LoadAssignmentsAsync()
@@ -244,3 +599,4 @@
         _ => Color.Default
     };
 }
+
