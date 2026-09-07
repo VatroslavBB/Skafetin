@@ -1,0 +1,27 @@
+@page "/nema-pristupa"
+@layout MainLayout
+
+<PageTitle>Nema pristupa - Škafetin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-8" Outlined="true" Elevation="0">
+        <div class="d-flex align-center mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Block" Color="Color.Error" Size="Size.Large" Class="mr-3" />
+            <MudText Typo="Typo.h5">Nema pristupa</MudText>
+        </div>
+
+        <MudText Typo="Typo.body1" Class="mb-2">
+            Tvoje uloge ne dopuštaju otvaranje te stranice.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
+            Ako misliš da bi trebao imati pristup, javi se administratoru sustava.
+        </MudText>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Home"
+                   Href="/">
+            Natrag na početnu
+        </MudButton>
+    </MudPaper>
+</MudContainer>

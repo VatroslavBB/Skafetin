@@ -15,6 +15,7 @@ public class EquipmentController : ControllerBase
 {
     private const int DefaultPageSize = 20;
     private const int MaxPageSize = 100;
+    private const int EquipmentStatusWriteOff = 5;
 
     private readonly SkafetinDbContext _context;
 
@@ -232,6 +233,9 @@ public class EquipmentController : ControllerBase
                 Message = $"Oprema s inventurnim brojem \"{inventoryNumber}\" već postoji."
             });
 
+        var fromStatusId = equipment.EquipmentStatusId;
+        var fromLocationId = equipment.LocationId;
+
         equipment.Name = dto.Name.Trim();
         equipment.InventoryNumber = inventoryNumber;
         equipment.Description = dto.Description;
@@ -242,9 +246,55 @@ public class EquipmentController : ControllerBase
         equipment.LocationId = dto.LocationId;
         equipment.PurchaseValue = dto.PurchaseValue;
 
+        EquipmentHistoryWriter.Record(
+            _context, equipment, fromStatusId, fromLocationId, User, "Izmjena podataka o opremi");
+
         await _context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
+    [HttpPost("{id:int}/move")]
+    public async Task<ActionResult<EquipmentDto>> MoveEquipment(int id, MoveEquipmentDto dto)
+    {
+        var equipment = await _context.Equipment.FindAsync(id);
+
+        if (equipment is null)
+            return NotFound();
+
+        if (equipment.EquipmentStatusId == EquipmentStatusWriteOff)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Otpisana oprema se ne može premjestiti."
+            });
+
+        if (equipment.LocationId == dto.ToLocationId)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Oprema se već nalazi na odabranoj lokaciji."
+            });
+
+        if (!await _context.Locations.AnyAsync(l => l.Id == dto.ToLocationId && l.IsActive))
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Odabrana lokacija ne postoji ili nije aktivna."
+            });
+
+        var fromLocationId = equipment.LocationId;
+        equipment.LocationId = dto.ToLocationId;
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, equipment.EquipmentStatusId, fromLocationId, User, dto.Reason);
+
+        await _context.SaveChangesAsync();
+
+        var result = await _context.Equipment
+            .Where(e => e.Id == id)
+            .Select(ToDto)
+            .FirstAsync();
+
+        return Ok(result);
     }
 
     [Authorize(Policy = AuthorizationPolicies.AdminOnly)]

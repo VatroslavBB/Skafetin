@@ -4,12 +4,13 @@ using Skafetin.Shared.DTOs;
 
 namespace Skafetin.App.Services;
 
-public sealed class CurrentUserService
+public sealed class CurrentUserService : IDisposable
 {
     private const string StorageKey = "skafetin.auth.session";
 
     private readonly HttpClient _http;
     private readonly ProtectedLocalStorage _storage;
+    private Timer? _expiryTimer;
 
     public CurrentUserService(HttpClient http, ProtectedLocalStorage storage)
     {
@@ -27,6 +28,8 @@ public sealed class CurrentUserService
     private bool IsExpired => !ExpiresAtUtc.HasValue || ExpiresAtUtc.Value <= DateTime.UtcNow;
 
     public event Action? UserChanged;
+
+    public event Action? SessionExpiring;
 
     public async Task InitializeAsync()
     {
@@ -77,6 +80,21 @@ public sealed class CurrentUserService
 
     public bool HasAnyRole(params string[] roles) => User?.Roles.Any(roles.Contains) == true;
 
+    public void ExpireSession()
+    {
+        if (User is null)
+            return;
+
+        StopExpiryTimer();
+
+        User = null;
+        AccessToken = null;
+        ExpiresAtUtc = null;
+        _http.DefaultRequestHeaders.Authorization = null;
+
+        UserChanged?.Invoke();
+    }
+
     private void ApplySession(LoginResponseDto response)
     {
         User = response.User;
@@ -85,10 +103,37 @@ public sealed class CurrentUserService
 
         _http.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", response.AccessToken);
+
+        ScheduleExpiry(response.ExpiresAtUtc);
     }
+
+    private void ScheduleExpiry(DateTime expiresAtUtc)
+    {
+        StopExpiryTimer();
+
+        var remaining = expiresAtUtc - DateTime.UtcNow;
+
+        if (remaining <= TimeSpan.Zero)
+        {
+            ExpireSession();
+            return;
+        }
+
+        _expiryTimer = new Timer(_ => SessionExpiring?.Invoke(), null, remaining, Timeout.InfiniteTimeSpan);
+    }
+
+    private void StopExpiryTimer()
+    {
+        _expiryTimer?.Dispose();
+        _expiryTimer = null;
+    }
+
+    public void Dispose() => StopExpiryTimer();
 
     private async Task ClearSessionAsync()
     {
+        StopExpiryTimer();
+
         User = null;
         AccessToken = null;
         ExpiresAtUtc = null;

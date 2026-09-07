@@ -22,7 +22,10 @@ var jwtOptions = jwtSection.Get<JwtOptions>()
     ?? throw new InvalidOperationException("Nedostaje Jwt konfiguracija.");
 
 if (jwtOptions.SigningKey.Length < 32)
-    throw new InvalidOperationException("Jwt:SigningKey mora imati najmanje 32 znaka.");
+    throw new InvalidOperationException(
+        "Jwt:SigningKey nije postavljen ili je kraći od 32 znaka. " +
+        "Postavi ga naredbom: dotnet user-secrets set \"Jwt:SigningKey\" \"<ključ>\" " +
+        "u mapi projekta Skafetin.Api.");
 
 builder.Services.Configure<JwtOptions>(jwtSection);
 builder.Services.AddScoped<JwtTokenService>();

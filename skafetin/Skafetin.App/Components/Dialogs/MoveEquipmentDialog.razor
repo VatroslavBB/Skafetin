@@ -1,0 +1,89 @@
+@inject ApiClient Api
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.MoveDown" Class="mr-2" />
+            Promjena lokacije
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @InventoryNumber - @EquipmentName<br />
+            Trenutna lokacija: @CurrentLocationName
+        </MudText>
+
+        <MudSelect T="int"
+                   Label="Nova lokacija"
+                   @bind-Value="toLocationId"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var location in locations.Where(l => l.Id != CurrentLocationId))
+            {
+                <MudSelectItem T="int" Value="@location.Id">@location.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField T="string"
+                      Label="Razlog"
+                      @bind-Value="reason"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+
+        @if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@validationMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Premjesti</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public int CurrentLocationId { get; set; }
+    [Parameter] public string? CurrentLocationName { get; set; }
+    [Parameter] public string? InventoryNumber { get; set; }
+    [Parameter] public string? EquipmentName { get; set; }
+
+    private List<LookupDto> locations = new();
+    private int toLocationId;
+    private string? reason;
+    private string? validationMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<List<LookupDto>>("api/locations/lookup");
+
+        if (result.IsSuccess && result.Data is not null)
+            locations = result.Data;
+        else
+            validationMessage = result.ErrorMessage;
+    }
+
+    private void Submit()
+    {
+        if (toLocationId <= 0)
+        {
+            validationMessage = "Odabir lokacije je obavezan.";
+            return;
+        }
+
+        if (toLocationId == CurrentLocationId)
+        {
+            validationMessage = "Oprema se već nalazi na odabranoj lokaciji.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new MoveEquipmentDto
+        {
+            ToLocationId = toLocationId,
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()
+        }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
