@@ -24,6 +24,9 @@ public class InventoriesController: ControllerBase
     private const int EquipmentStatusWrittenOff = 5;
     private const int AssignmentStatusActive = 1;
 
+    private const int DefaultItemsPageSize = 20;
+    private const int MaxItemsPageSize = 100;
+
     public InventoriesController(SkafetinDbContext context)
     {
         _context = context;
@@ -241,13 +244,19 @@ public class InventoriesController: ControllerBase
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]
     [HttpGet("{id:int}/items")]
-    public async Task<ActionResult<List<InventoryItemDto>>> GetInventoryItems(
+    public async Task<ActionResult<PagedResultDto<InventoryItemDto>>> GetInventoryItems(
         int id,
         [FromQuery] string? search,
         [FromQuery] bool? onlyDiscrepancies,
         [FromQuery] bool? isFound,
+        [FromQuery] bool? isDamaged,
         [FromQuery] int? categoryId,
-        [FromQuery] int? employeeId)
+        [FromQuery] int? employeeId,
+        [FromQuery] int? foundLocationId,
+        [FromQuery] string? sortBy,
+        [FromQuery] bool? sortDesc,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize)
     {
         var (inventory, error) = await LoadInventoryAsync(id);
         if (inventory is null)
@@ -270,17 +279,65 @@ public class InventoriesController: ControllerBase
 
         if (isFound.HasValue)
             query = query.Where(x => x.IsFound == isFound.Value);
+        if (isDamaged.HasValue)
+            query = query.Where(x => x.IsDamaged == isDamaged.Value);
         if (categoryId.HasValue)
             query = query.Where(x => x.Equipment!.EquipmentCategoryId == categoryId.Value);
         if (employeeId.HasValue)
             query = query.Where(x => x.ExpectedEmployeeId == employeeId.Value);
+        if (foundLocationId.HasValue)
+            query = query.Where(x => x.FoundLocationId == foundLocationId.Value);
 
-        var result = await query
-            .OrderBy(x => x.Equipment!.Name)
-            .ThenBy(x => x.Id)
+        var descending = sortDesc ?? false;
+
+        IOrderedQueryable<InventoryItem> ordered = sortBy?.ToLowerInvariant() switch
+        {
+            "inventorynumber" => descending
+                ? query.OrderByDescending(x => x.Equipment!.InventoryNumber)
+                : query.OrderBy(x => x.Equipment!.InventoryNumber),
+            "category" => descending
+                ? query.OrderByDescending(x => x.Equipment!.EquipmentCategory!.Name)
+                : query.OrderBy(x => x.Equipment!.EquipmentCategory!.Name),
+            "employee" => descending
+                ? query.OrderByDescending(x => x.ExpectedEmployee!.LastName)
+                : query.OrderBy(x => x.ExpectedEmployee!.LastName),
+            "foundlocation" => descending
+                ? query.OrderByDescending(x => x.FoundLocation!.Name)
+                : query.OrderBy(x => x.FoundLocation!.Name),
+            "isfound" => descending
+                ? query.OrderByDescending(x => x.IsFound)
+                : query.OrderBy(x => x.IsFound),
+            "isdamaged" => descending
+                ? query.OrderByDescending(x => x.IsDamaged)
+                : query.OrderBy(x => x.IsDamaged),
+            "checkedat" => descending
+                ? query.OrderByDescending(x => x.CheckedAt)
+                : query.OrderBy(x => x.CheckedAt),
+            _ => descending
+                ? query.OrderByDescending(x => x.Equipment!.Name)
+                : query.OrderBy(x => x.Equipment!.Name)
+        };
+
+        var sorted = ordered.ThenBy(x => x.Id);
+
+        var currentPage = page.HasValue && page.Value > 0 ? page.Value : 1;
+        var currentPageSize = Math.Clamp(pageSize ?? DefaultItemsPageSize, 1, MaxItemsPageSize);
+
+        var totalCount = await sorted.CountAsync();
+
+        var items = await sorted
+            .Skip((currentPage - 1) * currentPageSize)
+            .Take(currentPageSize)
             .Select(ToInventoryItemDto)
             .ToListAsync();
-        return Ok(result);
+
+        return Ok(new PagedResultDto<InventoryItemDto>
+        {
+            TotalCount = totalCount,
+            Page = currentPage,
+            PageSize = currentPageSize,
+            Items = items
+        });
     }
 
     [Authorize(Policy = AuthorizationPolicies.InventoryWork)]

@@ -97,13 +97,13 @@
                                   AdornmentIcon="@Icons.Material.Filled.Search"
                                   Immediate="true"
                                   DebounceInterval="400"
-                                  OnDebounceIntervalElapsed="LoadItemsAsync"
+                                  OnDebounceIntervalElapsed="ReloadItemsAsync"
                                   Variant="Variant.Outlined" />
                 </MudItem>
                 <MudItem xs="12" md="3">
                     <MudSelect T="int?"
                                @bind-Value="selectedCategoryId"
-                               @bind-Value:after="LoadItemsAsync"
+                               @bind-Value:after="ReloadItemsAsync"
                                Label="Kategorija"
                                Clearable="true"
                                Variant="Variant.Outlined">
@@ -116,20 +116,51 @@
                 <MudItem xs="12" md="3">
                     <MudSelect T="bool?"
                                @bind-Value="selectedIsFound"
-                               @bind-Value:after="LoadItemsAsync"
+                               @bind-Value:after="ReloadItemsAsync"
                                Label="Popisano"
                                Clearable="true"
                                Variant="Variant.Outlined">
                         <MudSelectItem T="bool?" Value="true">Pronađeno</MudSelectItem>
-                        <MudSelectItem T="bool?" Value="false">Nije pronađeno</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="false">Nedostaje</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="bool?"
+                               @bind-Value="selectedIsDamaged"
+                               @bind-Value:after="ReloadItemsAsync"
+                               Label="Oštećeno"
+                               Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="bool?" Value="true">Oštećeno</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="false">Neoštećeno</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="int?"
+                               @bind-Value="selectedFoundLocationId"
+                               @bind-Value:after="ReloadItemsAsync"
+                               Label="Pronađeno na lokaciji"
+                               Clearable="true"
+                               Variant="Variant.Outlined">
+                        @foreach (var location in locations)
+                        {
+                            <MudSelectItem T="int?" Value="@location.Id">@location.Name</MudSelectItem>
+                        }
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="3">
                     <MudSwitch T="bool"
                                @bind-Value="onlyDiscrepancies"
-                               @bind-Value:after="LoadItemsAsync"
+                               @bind-Value:after="ReloadItemsAsync"
                                Color="Color.Warning"
                                Label="Samo odstupanja" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.FilterAltOff"
+                               OnClick="ClearFiltersAsync">
+                        Očisti
+                    </MudButton>
                 </MudItem>
             </MudGrid>
         </MudPaper>
@@ -140,19 +171,19 @@
         }
 
         <MudTable T="InventoryItemDto"
-                  Items="items"
+                  @ref="itemsTable"
+                  ServerData="LoadServerDataAsync"
                   Hover="true"
                   Striped="true"
                   Elevation="0"
-                  Dense="true"
-                  Loading="isLoadingItems">
+                  Dense="true">
             <HeaderContent>
-                <MudTh>Inventurni broj</MudTh>
-                <MudTh>Oprema</MudTh>
-                <MudTh>Kategorija</MudTh>
-                <MudTh>Očekivano kod</MudTh>
-                <MudTh>Stanje</MudTh>
-                <MudTh>Popisao</MudTh>
+                <MudTh><MudTableSortLabel T="InventoryItemDto" SortLabel="inventoryNumber">Inventurni broj</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel T="InventoryItemDto" SortLabel="name" InitialDirection="SortDirection.Ascending">Oprema</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel T="InventoryItemDto" SortLabel="category">Kategorija</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel T="InventoryItemDto" SortLabel="employee">Očekivano kod</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel T="InventoryItemDto" SortLabel="isFound">Stanje</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel T="InventoryItemDto" SortLabel="checkedAt">Popisao</MudTableSortLabel></MudTh>
                 <MudTh Style="width: 60px;"></MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -229,17 +260,18 @@
     [Parameter] public int Id { get; set; }
 
     private InventoryDetailsDto? inventory;
-    private List<InventoryItemDto> items = new();
+    private MudTable<InventoryItemDto>? itemsTable;
     private List<LookupDto> categories = new();
     private List<LookupDto> locations = new();
 
     private string? search;
     private int? selectedCategoryId;
     private bool? selectedIsFound;
+    private bool? selectedIsDamaged;
+    private int? selectedFoundLocationId;
     private bool onlyDiscrepancies;
 
     private bool isLoading = true;
-    private bool isLoadingItems;
     private bool isBusy;
     private string? errorMessage;
     private string? itemsError;
@@ -273,7 +305,7 @@
         if (result.IsSuccess && result.Data is not null)
         {
             inventory = result.Data;
-            await LoadItemsAsync();
+            await ReloadItemsAsync();
         }
         else
         {
@@ -283,10 +315,9 @@
         isLoading = false;
     }
 
-    // Filtri stavaka idu na posluzitelja, ne u preglednik.
-    private async Task LoadItemsAsync()
+    // Filtri, sortiranje i stranicanje stavaka idu na posluzitelja, ne u preglednik.
+    private async Task<TableData<InventoryItemDto>> LoadServerDataAsync(TableState state, CancellationToken token)
     {
-        isLoadingItems = true;
         itemsError = null;
 
         var parameters = new List<string>();
@@ -300,19 +331,56 @@
         if (selectedIsFound.HasValue)
             parameters.Add($"isFound={selectedIsFound.Value.ToString().ToLowerInvariant()}");
 
+        if (selectedIsDamaged.HasValue)
+            parameters.Add($"isDamaged={selectedIsDamaged.Value.ToString().ToLowerInvariant()}");
+
         if (selectedCategoryId.HasValue)
             parameters.Add($"categoryId={selectedCategoryId.Value}");
 
-        var url = $"api/inventories/{Id}/items" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : string.Empty);
+        if (selectedFoundLocationId.HasValue)
+            parameters.Add($"foundLocationId={selectedFoundLocationId.Value}");
 
-        var result = await Api.GetAsync<List<InventoryItemDto>>(url);
+        if (!string.IsNullOrWhiteSpace(state.SortLabel) && state.SortDirection != SortDirection.None)
+        {
+            parameters.Add($"sortBy={state.SortLabel}");
+            parameters.Add($"sortDesc={(state.SortDirection == SortDirection.Descending).ToString().ToLowerInvariant()}");
+        }
+
+        parameters.Add($"page={state.Page + 1}");
+        parameters.Add($"pageSize={state.PageSize}");
+
+        var url = $"api/inventories/{Id}/items?" + string.Join("&", parameters);
+
+        var result = await Api.GetAsync<PagedResultDto<InventoryItemDto>>(url);
 
         if (result.IsSuccess && result.Data is not null)
-            items = result.Data;
-        else
-            itemsError = result.ErrorMessage ?? "Dohvat stavaka nije uspio.";
+            return new TableData<InventoryItemDto>
+            {
+                Items = result.Data.Items,
+                TotalItems = result.Data.TotalCount
+            };
 
-        isLoadingItems = false;
+        itemsError = result.ErrorMessage ?? "Dohvat stavaka nije uspio.";
+
+        return new TableData<InventoryItemDto> { Items = new List<InventoryItemDto>(), TotalItems = 0 };
+    }
+
+    private async Task ReloadItemsAsync()
+    {
+        if (itemsTable is not null)
+            await itemsTable.ReloadServerData();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedCategoryId = null;
+        selectedIsFound = null;
+        selectedIsDamaged = null;
+        selectedFoundLocationId = null;
+        onlyDiscrepancies = false;
+
+        await ReloadItemsAsync();
     }
 
     private async Task CheckItemAsync(InventoryItemDto item)
