@@ -6,10 +6,12 @@ namespace Skafetin.App.Services;
 public sealed class ApiClient
 {
     private readonly HttpClient _http;
+    private readonly CurrentUserService _currentUser;
 
-    public ApiClient(HttpClient http)
+    public ApiClient(HttpClient http, CurrentUserService currentUser)
     {
         _http = http;
+        _currentUser = currentUser;
     }
     public Task<ApiResult<T>> GetAsync<T>(string url)
         => SendAsync<T>(() => _http.GetAsync(url));
@@ -33,7 +35,10 @@ public sealed class ApiClient
             var response = await _http.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
+            {
+                ExpireOnUnauthorized(response);
                 return ApiResult<byte[]>.Fail(await ReadErrorAsync(response));
+            }
 
             return ApiResult<byte[]>.Ok(await response.Content.ReadAsByteArrayAsync());
         }
@@ -50,7 +55,10 @@ public sealed class ApiClient
             var response = await call();
 
             if (!response.IsSuccessStatusCode)
+            {
+                ExpireOnUnauthorized(response);
                 return ApiResult<T>.Fail(await ReadErrorAsync(response));
+            }
 
             if (response.StatusCode == HttpStatusCode.NoContent ||
                 response.Content.Headers.ContentLength == 0)
@@ -66,6 +74,12 @@ public sealed class ApiClient
         {
             return ApiResult<T>.Fail("Odgovor poslužitelja nije u očekivanom obliku.");
         }
+    }
+
+    private void ExpireOnUnauthorized(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            _currentUser.ExpireSession();
     }
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage response)

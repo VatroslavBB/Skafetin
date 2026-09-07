@@ -105,6 +105,8 @@ else
         if (!isSubscribed)
         {
             Navigation.LocationChanged += OnLocationChanged;
+            currentUser.UserChanged += OnUserChanged;
+            currentUser.SessionExpiring += OnSessionExpiring;
             isSubscribed = true;
         }
 
@@ -114,6 +116,16 @@ else
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
         InvokeAsync(RedirectIfNotLoggedIn);
+
+    private void OnSessionExpiring() =>
+        InvokeAsync(currentUser.ExpireSession);
+
+    private void OnUserChanged() =>
+        InvokeAsync(() =>
+        {
+            RedirectIfNotLoggedIn();
+            StateHasChanged();
+        });
 
     private void RedirectIfNotLoggedIn()
     {
@@ -134,7 +146,11 @@ else
 
     public void Dispose()
     {
-        if (isSubscribed)
-            Navigation.LocationChanged -= OnLocationChanged;
+        if (!isSubscribed)
+            return;
+
+        Navigation.LocationChanged -= OnLocationChanged;
+        currentUser.UserChanged -= OnUserChanged;
+        currentUser.SessionExpiring -= OnSessionExpiring;
     }
 }
