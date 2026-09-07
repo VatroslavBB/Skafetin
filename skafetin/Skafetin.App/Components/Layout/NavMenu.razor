@@ -40,6 +40,10 @@
                 </MudNavLink>
             }
             <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep" Disabled="true">
+            <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail" Disabled="true">
+                Zahtjevi za opremom
+            </MudNavLink>
+            <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep">
                 Otpis
             </MudNavLink>
         }
@@ -71,7 +75,7 @@
         @if (CurrentUser.HasRole("Admin"))
         {
             <MudDivider Class="my-2" />
-            <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts" Disabled="true">
+            <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">
                 Korisnici i uloge
             </MudNavLink>
         }
