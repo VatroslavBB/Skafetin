@@ -210,9 +210,14 @@ public class WriteOffRequestsController : ControllerBase
             {
                 Message = "Oprema je zadužena i mora se prvo vratiti."
             });
+        var fromStatusId = equipment.EquipmentStatusId;
         equipment.EquipmentStatusId = EquipmentStatusWriteOff;
         request.WriteOffRequestStatusId = WriteOffStatusExecuted;
         request.ExecutedAt = DateTime.Now;
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, fromStatusId, equipment.LocationId, User,
+            $"Proveden otpis: {request.Reason}");
 
         await _context.SaveChangesAsync();
 

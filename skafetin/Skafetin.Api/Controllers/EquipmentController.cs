@@ -233,6 +233,9 @@ public class EquipmentController : ControllerBase
                 Message = $"Oprema s inventurnim brojem \"{inventoryNumber}\" već postoji."
             });
 
+        var fromStatusId = equipment.EquipmentStatusId;
+        var fromLocationId = equipment.LocationId;
+
         equipment.Name = dto.Name.Trim();
         equipment.InventoryNumber = inventoryNumber;
         equipment.Description = dto.Description;
@@ -242,6 +245,9 @@ public class EquipmentController : ControllerBase
         equipment.EquipmentStatusId = dto.EquipmentStatusId;
         equipment.LocationId = dto.LocationId;
         equipment.PurchaseValue = dto.PurchaseValue;
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, fromStatusId, fromLocationId, User, "Izmjena podataka o opremi");
 
         await _context.SaveChangesAsync();
 
@@ -275,7 +281,11 @@ public class EquipmentController : ControllerBase
                 Message = "Odabrana lokacija ne postoji ili nije aktivna."
             });
 
+        var fromLocationId = equipment.LocationId;
         equipment.LocationId = dto.ToLocationId;
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, equipment.EquipmentStatusId, fromLocationId, User, dto.Reason);
 
         await _context.SaveChangesAsync();
 

@@ -172,9 +172,15 @@ public class AssignmentsController: ControllerBase
             CreatedAt = DateTime.Now
         };
 
+        var fromStatusId = equipment.EquipmentStatusId;
         equipment.EquipmentStatusId = EquipmentStatusAssigned;
 
         _context.Assignments.Add(assignment);
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, fromStatusId, equipment.LocationId, User,
+            $"Zaduženje: {employee.FirstName} {employee.LastName}");
+
         await _context.SaveChangesAsync();
         var result = await _context.Assignments
             .Where(a => a.Id == assignment.Id)
@@ -207,12 +213,16 @@ public class AssignmentsController: ControllerBase
             });
 
         var equipment = await _context.Equipment.FirstAsync(e => e.Id == assignment.EquipmentId);
+        var fromStatusId = equipment.EquipmentStatusId;
         if (equipment.EquipmentStatusId == EquipmentStatusAssigned)
             equipment.EquipmentStatusId = EquipmentStatusInStock;
 
         assignment.ReturnedAt = dto.ReturnedAt;
         assignment.Note = dto.Note!;
         assignment.AssignmentStatusId = AssignmentStatusReturned;
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, fromStatusId, equipment.LocationId, User, "Povrat zaduženja");
 
         await _context.SaveChangesAsync();
         var result = await _context.Assignments
@@ -305,10 +315,15 @@ public class AssignmentsController: ControllerBase
                 Message = "zaduženje nije aktivno."
             });
         var equipment = await _context.Equipment.FirstAsync(e => e.Id == assignment.EquipmentId);
+        var fromStatusId = equipment.EquipmentStatusId;
         if (equipment.EquipmentStatusId == EquipmentStatusAssigned)
             equipment.EquipmentStatusId = EquipmentStatusInStock;
         assignment.AssignmentStatusId = AssignmentStatusCanceled;
         assignment.ReturnedAt = DateTime.Now;
+
+        EquipmentHistoryWriter.Record(
+            _context, equipment, fromStatusId, equipment.LocationId, User, "Storno zaduženja");
+
         await _context.SaveChangesAsync();
         return NoContent();
     }
