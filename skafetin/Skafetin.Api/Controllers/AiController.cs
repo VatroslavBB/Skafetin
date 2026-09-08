@@ -23,6 +23,17 @@ public class AiController : ControllerBase
         _aiService = aiService;
     }
 
+    [HttpGet("status")]
+    public ActionResult<AiProviderStatusDto> GetStatus()
+    {
+        return Ok(new AiProviderStatusDto
+        {
+            Provider = _aiService.ProviderName,
+            Model = _aiService.ModelName,
+            UsesExternalService = _aiService.UsesExternalService
+        });
+    }
+
     [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpPost("inventory-summary/{inventoryId:int}")]
     public async Task<ActionResult<AiSuggestionDto>> GetInventorySummarySuggestion(
