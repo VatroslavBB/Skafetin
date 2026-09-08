@@ -11,7 +11,13 @@
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
     @if (inventory is not null)
     {
-        <PageHeader Title="@inventory.Code" Subtitle="@($"{inventory.LocationName} · otvorio {inventory.CreatedByEmployeeFullName}")">
+        <PageHeader Title="@inventory.Code" Subtitle="@($"{inventory.LocationName} · otvorio {inventory.CreatedByEmployeeFullName}")"
+            Icon="@Icons.Material.Filled.FactCheck"
+            Breadcrumbs="@(new List<BreadcrumbItem>
+                {
+                    new("Inventure", "/inventories"),
+                    new(inventory.Code, null, disabled: true)
+                })">
             <Actions>
                 <MudButton Variant="Variant.Text"
                            StartIcon="@Icons.Material.Filled.ArrowBack"
@@ -22,7 +28,7 @@
                 @if (inventory.InventoryStatusId == StatusDraft)
                 {
                     <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
+                               Color="Color.Secondary"
                                StartIcon="@Icons.Material.Filled.PlayArrow"
                                Disabled="isBusy"
                                OnClick="@(() => TransitionAsync("open", "Inventura je otvorena i stavke su generirane."))">
@@ -63,29 +69,44 @@
 
         <MudGrid Spacing="2" Class="mb-4">
             <MudItem xs="6" md="2">
-                <SummaryCard Label="Ukupno" Value="@inventory.Summary.Total" />
+                <SummaryCard Label="Ukupno" Value="@inventory.Summary.Total"
+                             Color="Color.Primary"
+                             Icon="@Icons.Material.Filled.Inventory2"
+                             Hint="stavki u popisu" />
             </MudItem>
             <MudItem xs="6" md="2">
-                <SummaryCard Label="Popisano" Value="@inventory.Summary.Counted" Color="Color.Info" />
+                <SummaryCard Label="Popisano" Value="@inventory.Summary.Counted"
+                             Color="Color.Info"
+                             Icon="@Icons.Material.Filled.Checklist"
+                             Hint="@CountedHint(inventory.Summary.Counted, inventory.Summary.Total)" />
             </MudItem>
             <MudItem xs="6" md="2">
-                <SummaryCard Label="Manjak" Value="@inventory.Summary.Missing" Color="Color.Error" />
+                <SummaryCard Label="Manjak" Value="@inventory.Summary.Missing"
+                             Color="Color.Error"
+                             Icon="@Icons.Material.Filled.ReportProblem"
+                             Hint="nije pronađeno" />
             </MudItem>
             <MudItem xs="6" md="2">
-                <SummaryCard Label="Oštećeno" Value="@inventory.Summary.Damaged" Color="Color.Warning" />
+                <SummaryCard Label="Oštećeno" Value="@inventory.Summary.Damaged"
+                             Color="Color.Warning"
+                             Icon="@Icons.Material.Filled.Build"
+                             Hint="za procjenu otpisa" />
             </MudItem>
             <MudItem xs="6" md="2">
-                <SummaryCard Label="Krivo mjesto" Value="@inventory.Summary.WrongLocation" Color="Color.Warning" />
+                <SummaryCard Label="Krivo mjesto" Value="@inventory.Summary.WrongLocation"
+                             Color="Color.Warning"
+                             Icon="@Icons.Material.Filled.WrongLocation"
+                             Hint="za prijenos" />
             </MudItem>
             <MudItem xs="6" md="2">
-                <MudPaper Class="pa-3" Elevation="0">
-                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Status</MudText>
+                <MudPaper Class="skf-card pa-3" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.overline" Class="mud-text-secondary d-block mb-1">Status</MudText>
                     <MudText Typo="Typo.h6">@inventory.InventoryStatusName</MudText>
                 </MudPaper>
             </MudItem>
         </MudGrid>
 
-        <MudPaper Class="pa-4 mb-4" Elevation="0">
+        <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
             <MudGrid Spacing="2" Class="align-center">
                 <MudItem xs="12" md="3">
                     <MudTextField T="string"
@@ -234,11 +255,16 @@
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
-                <MudText Class="pa-4">
-                    @(inventory.InventoryStatusId == StatusDraft
-                        ? "Stavke nastaju tek kad se inventura otvori."
-                        : "Nema stavaka koje odgovaraju filtrima.")
-                </MudText>
+                @if (inventory.InventoryStatusId == StatusDraft)
+                {
+                    <EmptyState Title="Popis još nije generiran"
+                                Description="Stavke nastaju tek kad se inventura otvori gumbom Otvori popis." />
+                }
+                else
+                {
+                    <EmptyState Title="Nema stavaka za ove filtre"
+                                Description="Promijeni kategoriju ili pretragu, ili očisti filtre." />
+                }
             </NoRecordsContent>
             <PagerContent>
                 <MudTablePager RowsPerPageString="Redaka po stranici:"
@@ -250,6 +276,9 @@
 </LoadingArea>
 
 @code {
+    private static string? CountedHint(int counted, int total) =>
+        total <= 0 ? null : $"{Math.Round(counted * 100d / total)} % popisano";
+
     private const int StatusDraft = 1;
     private const int StatusOpen = 2;
     private const int StatusInProgress = 3;

@@ -6,7 +6,8 @@
 
 <PageTitle>Nova lokacija</PageTitle>
 
-<PageHeader Title="Nova lokacija" Subtitle="Unos nove lokacije" />
+<PageHeader Title="Nova lokacija" Subtitle="Unos nove lokacije"
+            Icon="@Icons.Material.Filled.Place" />
 
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
     <MudPaper Class="pa-6" Elevation="0" Style="max-width: 720px;">
@@ -60,7 +61,7 @@
             <div class="d-flex gap-2 mt-6">
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
-                           Color="Color.Primary"
+                           Color="Color.Secondary"
                            Disabled="isSaving">
                     Spremi
                 </MudButton>

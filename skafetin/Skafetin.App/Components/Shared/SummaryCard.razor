@@ -1,10 +1,37 @@
-<MudPaper Class="pa-3" Elevation="0">
-    <MudText Typo="Typo.caption" Class="mud-text-secondary">@Label</MudText>
-    <MudText Typo="Typo.h5" Color="@Color">@Value</MudText>
+
+
+<MudPaper Class="skf-card pa-3" Elevation="0" Outlined="true" Style="@($"--skf-stripe:{StripeColor};")">
+    <div class="d-flex align-center mb-1">
+        @if (!string.IsNullOrWhiteSpace(Icon))
+        {
+            <MudIcon Icon="@Icon" Size="Size.Small" Color="@Color" Class="mr-1" />
+        }
+        <MudText Typo="Typo.overline" Class="mud-text-secondary">@Label</MudText>
+    </div>
+
+    <MudText Typo="Typo.h4" Class="num">@Value</MudText>
+
+    @if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Hint</MudText>
+    }
 </MudPaper>
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public int Value { get; set; }
     [Parameter] public Color Color { get; set; } = Color.Default;
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Hint { get; set; }
+    private string StripeColor => Color switch
+    {
+        Color.Primary   => "var(--mud-palette-primary)",
+        Color.Secondary => "var(--mud-palette-secondary)",
+        Color.Tertiary  => "var(--mud-palette-tertiary)",
+        Color.Info      => "var(--mud-palette-info)",
+        Color.Success   => "var(--mud-palette-success)",
+        Color.Warning   => "var(--mud-palette-warning)",
+        Color.Error     => "var(--mud-palette-error)",
+        _               => "var(--mud-palette-lines-default)"
+    };
 }

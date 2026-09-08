@@ -1,24 +1,34 @@
-@page "/"
+﻿@page "/"
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject NavigationManager Navigation
 
 <PageTitle>Početna - Škafetin</PageTitle>
 
-<PageHeader Title="Pregled" Subtitle="Stanje imovine i posljednje promjene" />
+<PageHeader Title="Pregled"
+            Subtitle="Stanje imovine i posljednje promjene"
+            Icon="@Icons.Material.Filled.Dashboard" />
 
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
     @if (summary is not null)
     {
         @if (summary.Personal is not null)
         {
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Moje</MudText>
+            <MudText Typo="Typo.overline" Class="mud-text-secondary d-block mb-2">Moje</MudText>
             <MudGrid Spacing="2" Class="mb-6">
                 <MudItem xs="6" md="3">
-                    <SummaryCard Label="Zadužena oprema" Value="@summary.Personal.ActiveAssignments" Color="Color.Info" />
+                    <SummaryCard Label="Zadužena oprema"
+                                 Value="@summary.Personal.ActiveAssignments"
+                                 Color="Color.Info"
+                                 Icon="@Icons.Material.Filled.Laptop"
+                                 Hint="trenutno na tvoje ime" />
                 </MudItem>
                 <MudItem xs="6" md="3">
-                    <SummaryCard Label="Otvoreni zahtjevi" Value="@summary.Personal.OpenRequests" Color="Color.Warning" />
+                    <SummaryCard Label="Otvoreni zahtjevi"
+                                 Value="@summary.Personal.OpenRequests"
+                                 Color="Color.Warning"
+                                 Icon="@Icons.Material.Filled.Outbox"
+                                 Hint="čekaju obradu" />
                 </MudItem>
                 <MudItem xs="12" md="6" Class="d-flex align-center">
                     <MudButton Variant="Variant.Outlined"
@@ -38,13 +48,13 @@
 
         @if (summary.Global is not null)
         {
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Cijela županija</MudText>
+            <MudText Typo="Typo.overline" Class="mud-text-secondary d-block mb-2">Cijela županija</MudText>
             @RenderOverview(summary.Global)
         }
 
         @if (summary.Location is not null)
         {
-            <MudText Typo="Typo.subtitle1" Class="mb-2">
+            <MudText Typo="Typo.overline" Class="mud-text-secondary d-block mb-2">
                 Moja lokacija: @summary.Location.LocationName
             </MudText>
             @RenderOverview(summary.Location)
@@ -52,9 +62,10 @@
 
         @if (summary.Global is null && summary.Location is null && summary.Personal is null)
         {
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                Tvoj račun nema podataka za prikaz na početnoj stranici.
-            </MudAlert>
+            <MudPaper Elevation="0" Outlined="true">
+                <EmptyState Title="Nema podataka za tvoj račun"
+                            Description="Tvoja uloga ne obuhvaća nijednu lokaciju ni zaduženje, pa pregled nema što prikazati." />
+            </MudPaper>
         }
     }
 </LoadingArea>
@@ -63,6 +74,9 @@
     private DashboardSummaryDto? summary;
     private bool isLoading = true;
     private string? errorMessage;
+
+    private static string? ShareOfTotal(int part, int total) =>
+        total <= 0 ? null : $"{Math.Round(part * 100d / total)} % fonda";
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,36 +94,64 @@
         @<div class="mb-6">
             <MudGrid Spacing="2" Class="mb-3">
                 <MudItem xs="6" md="2">
-                    <SummaryCard Label="Ukupno opreme" Value="@overview.TotalEquipment" />
+                    <SummaryCard Label="Ukupno" Value="@overview.TotalEquipment"
+                                 Color="Color.Primary"
+                                 Icon="@Icons.Material.Filled.Inventory2"
+                                 Hint="komada u evidenciji" />
                 </MudItem>
                 <MudItem xs="6" md="2">
-                    <SummaryCard Label="Zaduženo" Value="@overview.AssignedEquipment" Color="Color.Info" />
+                    <SummaryCard Label="Zaduženo" Value="@overview.AssignedEquipment"
+                                 Color="Color.Info"
+                                 Icon="@Icons.Material.Filled.AssignmentTurnedIn"
+                                 Hint="@ShareOfTotal(overview.AssignedEquipment, overview.TotalEquipment)" />
                 </MudItem>
                 <MudItem xs="6" md="2">
-                    <SummaryCard Label="Na servisu" Value="@overview.InServiceEquipment" Color="Color.Warning" />
+                    <SummaryCard Label="Na servisu" Value="@overview.InServiceEquipment"
+                                 Color="Color.Warning"
+                                 Icon="@Icons.Material.Filled.Build"
+                                 Hint="privremeno nedostupno" />
                 </MudItem>
                 <MudItem xs="6" md="2">
-                    <SummaryCard Label="Nedostaje" Value="@overview.MissingEquipment" Color="Color.Error" />
+                    <SummaryCard Label="Nedostaje" Value="@overview.MissingEquipment"
+                                 Color="Color.Error"
+                                 Icon="@Icons.Material.Filled.ReportProblem"
+                                 Hint="utvrđeno inventurom" />
                 </MudItem>
                 <MudItem xs="6" md="2">
-                    <SummaryCard Label="Otvoreni zahtjevi" Value="@overview.OpenRequests" Color="Color.Warning" />
+                    @* Ne Secondary: zlatna ikona na bijeloj kartici je 2,96:1 i pada.
+                       Zlatna na ovoj stranici radi na plohi s vrijednošću, gdje prolazi. *@
+                    <SummaryCard Label="Zahtjevi" Value="@overview.OpenRequests"
+                                 Color="Color.Tertiary"
+                                 Icon="@Icons.Material.Filled.Mail"
+                                 Hint="čekaju obradu" />
                 </MudItem>
                 <MudItem xs="6" md="2">
-                    <SummaryCard Label="Inventure u tijeku" Value="@overview.InventoriesInProgress" Color="Color.Info" />
+                    <SummaryCard Label="Inventure" Value="@overview.InventoriesInProgress"
+                                 Color="Color.Success"
+                                 Icon="@Icons.Material.Filled.FactCheck"
+                                 Hint="u tijeku" />
                 </MudItem>
             </MudGrid>
 
-            <MudPaper Class="pa-4 mb-3" Elevation="0">
-                <MudText Typo="Typo.caption" Class="mud-text-secondary">Evidentirana vrijednost opreme</MudText>
-                <MudText Typo="Typo.h5">@overview.TotalPurchaseValue.ToString("N2") EUR</MudText>
+            <MudPaper Class="skf-highlight pa-4 mb-3" Elevation="0">
+                <MudText Typo="Typo.overline" Class="skf-highlight-label">Evidentirana vrijednost</MudText>
+                <MudText Typo="Typo.h4" Class="num skf-highlight-value">
+                    @overview.TotalPurchaseValue.ToString("N2") EUR
+                </MudText>
+                <MudText Typo="Typo.caption" Class="skf-highlight-label">
+                    nabavna vrijednost opreme u evidenciji
+                </MudText>
             </MudPaper>
 
-            <MudPaper Class="pa-4" Elevation="0">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">Zadnjih pet promjena</MudText>
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary d-block mb-2">
+                    Zadnjih pet promjena
+                </MudText>
 
                 @if (overview.RecentActivity.Count == 0)
                 {
-                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Još nema zabilježenih promjena.</MudText>
+                    <EmptyState Title="Još nema zabilježenih promjena"
+                                Description="Zaduženja, otpisi i inventure pojavit će se ovdje čim se dogode." />
                 }
                 else
                 {
@@ -119,7 +161,11 @@
                             {
                                 <tr>
                                     <td style="width: 130px;">
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@activity.Kind</MudChip>
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Variant="Variant.Outlined"
+                                                 Color="@StatusColors.ActivityKind(activity.Kind)">
+                                            @activity.Kind
+                                        </MudChip>
                                     </td>
                                     <td>
                                         @if (activity.EquipmentId.HasValue)
@@ -132,7 +178,7 @@
                                         }
                                     </td>
                                     <td class="mud-text-secondary">@activity.Description</td>
-                                    <td class="mud-text-secondary" style="width: 140px;">
+                                    <td class="mud-text-secondary num" style="width: 140px;">
                                         @activity.OccurredAt.ToString("dd.MM.yyyy. HH:mm")
                                     </td>
                                 </tr>

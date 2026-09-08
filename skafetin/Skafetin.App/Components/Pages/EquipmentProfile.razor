@@ -9,7 +9,13 @@
 
 <PageTitle>@(equipment?.Name ?? "Oprema")</PageTitle>
 
-<PageHeader Title="@(equipment?.Name ?? "Oprema")" Subtitle="@equipment?.InventoryNumber">
+<PageHeader Title="@(equipment?.Name ?? "Oprema")" Subtitle="@equipment?.InventoryNumber"
+            Icon="@Icons.Material.Filled.Inventory2"
+            Breadcrumbs="@(new List<BreadcrumbItem>
+                {
+                    new("Oprema", "/equipment"),
+                    new(equipment?.Name ?? "Detalji", null, disabled: true)
+                })">
     <Actions>
         <MudButton Variant="Variant.Outlined"
                    StartIcon="@Icons.Material.Filled.ArrowBack"
@@ -27,7 +33,7 @@
                 </MudButton>
             }
             <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
+                       Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Edit"
                        OnClick="@(() => Navigation.NavigateTo($"/equipment/edit/{Id}"))">
                 Uredi
@@ -45,7 +51,7 @@
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
     @if (equipment is not null)
     {
-        <MudPaper Class="pa-4" Elevation="0">
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
             <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6">
 
                 <MudTabPanel Text="Podaci" Icon="@Icons.Material.Filled.Description">
@@ -70,7 +76,7 @@
                                         <td>
                                             <MudChip T="string"
                                                      Size="Size.Small"
-                                                     Color="@StatusColor(equipment.EquipmentStatusName)"
+                                                     Color="@StatusColors.Equipment(equipment.EquipmentStatusName)"
                                                      Variant="Variant.Text">
                                                 @equipment.EquipmentStatusName
                                             </MudChip>
@@ -147,7 +153,7 @@
                                 <MudTd DataLabel="Status">
                                     <MudChip T="string"
                                              Size="Size.Small"
-                                             Color="@AssignmentStatusColor(context.AssignmentStatusName)"
+                                             Color="@StatusColors.Assignment(context.AssignmentStatusName)"
                                              Variant="Variant.Text">
                                         @context.AssignmentStatusName
                                     </MudChip>
@@ -638,14 +644,6 @@
             assignmentsError = result.ErrorMessage ?? "Dohvat povijesti zaduženja nije uspio.";
     }
 
-    private static Color AssignmentStatusColor(string statusName) => statusName switch
-    {
-        "Aktivno" => Color.Success,
-        "Vraćeno" => Color.Default,
-        "Premješteno" => Color.Info,
-        "Stornirano" => Color.Error,
-        _ => Color.Default
-    };
 
     private async Task DeleteAsync()
     {
@@ -670,13 +668,5 @@
 
     private static string Or(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 
-    private static Color StatusColor(string statusName) => statusName switch
-    {
-        "Na skladištu" => Color.Success,
-        "Zaduženo" => Color.Info,
-        "Na servisu" => Color.Warning,
-        "Nedostaje" => Color.Error,
-        _ => Color.Default
-    };
 }
 

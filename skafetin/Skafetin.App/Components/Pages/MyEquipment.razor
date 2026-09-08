@@ -5,9 +5,10 @@
 
 <PageTitle>Moja oprema</PageTitle>
 
-<PageHeader Title="Moja oprema" Subtitle="Oprema zadužena na tvoje ime" />
+<PageHeader Title="Moja oprema" Subtitle="Oprema zadužena na tvoje ime"
+            Icon="@Icons.Material.Filled.Laptop" />
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudSwitch T="bool"
                @bind-Value="activeOnly"
                @bind-Value:after="ReloadAsync"
@@ -40,7 +41,7 @@
             <MudTd DataLabel="Status">
                 <MudChip T="string"
                          Size="Size.Small"
-                         Color="@StatusColor(context.AssignmentStatusName)"
+                         Color="@StatusColors.Assignment(context.AssignmentStatusName)"
                          Variant="Variant.Text">
                     @context.AssignmentStatusName
                 </MudChip>
@@ -53,9 +54,16 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">
-                @(activeOnly ? "Trenutno nemaš zaduženu opremu." : "Nemaš nijedno zaduženje.")
-            </MudText>
+            @if (activeOnly)
+            {
+                <EmptyState Title="Trenutno nemaš zaduženu opremu"
+                            Description="Isključi prekidač iznad da vidiš i zaduženja koja su vraćena ili premještena." />
+            }
+            else
+            {
+                <EmptyState Title="Nemaš nijedno zaduženje"
+                            Description="Kad ti se zaduži oprema, pojavit će se ovdje." />
+            }
         </NoRecordsContent>
     </MudTable>
 </LoadingArea>
@@ -86,12 +94,4 @@
         isLoading = false;
     }
 
-    private static Color StatusColor(string statusName) => statusName switch
-    {
-        "Aktivno" => Color.Success,
-        "Vraćeno" => Color.Default,
-        "Premješteno" => Color.Info,
-        "Stornirano" => Color.Error,
-        _ => Color.Default
-    };
 }

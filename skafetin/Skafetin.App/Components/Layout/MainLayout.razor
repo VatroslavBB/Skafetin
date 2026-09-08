@@ -10,18 +10,26 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
+    <MudAppBar Elevation="0">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
                        OnClick="ToggleDrawer" />
-        <MudImage Src="skafetin-znak.svg" Height="44" Class="ml-2" Alt="Škafetin" />
-        <MudText Typo="Typo.h5" Class="ml-3">Škafetin</MudText>
+        <MudImage Src="skafetin-znak.svg" Height="34" Class="ml-2" Alt="Škafetin" />
+        <MudText Typo="Typo.h6" Class="ml-2">Škafetin</MudText>
         <MudSpacer />
         <MudIconButton Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit"
+                       Title="@(isDarkMode ? "Svijetla tema" : "Tamna tema")"
                        OnClick="@(() => isDarkMode = !isDarkMode)" />
 
         <AuthorizeView>
             <Authorized>
+                <div class="d-none d-sm-flex flex-column align-end mr-2">
+                    <MudText Typo="Typo.subtitle2">@context.User.Identity?.Name</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        @string.Join(", ", RolesOf(context.User))
+                    </MudText>
+                </div>
+
                 <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
                          AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
                     <MudText Typo="Typo.body1" Class="px-4 py-2">
@@ -50,7 +58,7 @@
         </AuthorizeView>
     </MudAppBar>
 
-    <MudDrawer @bind-Open="isDrawerOpen" Elevation="1"
+    <MudDrawer @bind-Open="isDrawerOpen" Elevation="0"
                Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always">
         <NavMenu />
     </MudDrawer>

@@ -8,12 +8,13 @@
 
 <PageTitle>Otpis</PageTitle>
 
-<PageHeader Title="Otpis opreme" Subtitle="Zahtjevi za otpisom neupotrebljive opreme i njihova obrada">
+<PageHeader Title="Otpis opreme" Subtitle="Zahtjevi za otpisom neupotrebljive opreme i njihova obrada"
+            Icon="@Icons.Material.Filled.DeleteSweep">
     <Actions>
         @if (canRequest)
         {
             <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
+                       Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Add"
                        OnClick="CreateAsync">
                 Novi zahtjev
@@ -31,7 +32,7 @@
 
 @if (canManage)
 {
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="5">
             <MudTextField T="string"
@@ -108,7 +109,7 @@
             <MudTd DataLabel="Status">
                 <MudChip T="string"
                          Size="Size.Small"
-                         Color="@StatusColor(context.WriteOffRequestStatusId)"
+                         Color="@StatusColors.WriteOff(context.WriteOffRequestStatusId)"
                          Variant="Variant.Text">
                     @context.WriteOffRequestStatusName
                 </MudChip>
@@ -151,7 +152,8 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">Nema zahtjeva za otpisom koji odgovaraju filtrima.</MudText>
+            <EmptyState Title="Nema zahtjeva za otpisom za ove filtre"
+                        Description="Promijeni status ili lokaciju, ili očisti filtre." />
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager RowsPerPageString="Redaka po stranici:"
@@ -342,13 +344,4 @@
         }
     }
 
-    private static Color StatusColor(int statusId) => statusId switch
-    {
-        StatusReceived => Color.Default,
-        StatusInProgress => Color.Info,
-        StatusApproved => Color.Success,
-        StatusRejected => Color.Error,
-        StatusExecuted => Color.Dark,
-        _ => Color.Default
-    };
 }

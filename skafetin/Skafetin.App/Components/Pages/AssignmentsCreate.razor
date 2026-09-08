@@ -6,7 +6,8 @@
 
 <PageTitle>Novo zaduženje</PageTitle>
 
-<PageHeader Title="Novo zaduženje" Subtitle="Zaduživanje opreme zaposleniku" />
+<PageHeader Title="Novo zaduženje" Subtitle="Zaduživanje opreme zaposleniku"
+            Icon="@Icons.Material.Filled.AssignmentTurnedIn" />
 
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
     <MudPaper Class="pa-6" Elevation="0" Style="max-width: 720px;">
@@ -62,7 +63,7 @@
             <div class="d-flex gap-2 mt-6">
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
-                           Color="Color.Primary"
+                           Color="Color.Secondary"
                            Disabled="isSaving">
                     Zaduži
                 </MudButton>
