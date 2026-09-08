@@ -1,5 +1,4 @@
 ﻿@page "/write-off-requests"
-@attribute [Authorize(Roles = "Admin,AssetManager")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject IDialogService DialogService
@@ -182,8 +181,8 @@
     private bool isLoading = true;
     private string? errorMessage;
 
-    private bool canManage => CurrentUser.HasAnyRole("Admin", "AssetManager");
-    private bool canRequest => CurrentUser.HasAnyRole("Admin", "AssetManager", "LocationResponsible");
+    private bool canManage => CurrentUser.HasAnyRole("Admin", "InventoryManager");
+    private bool canRequest => CurrentUser.HasAnyRole("Admin", "InventoryManager", "LocationResponsible");
     private bool isAdmin => CurrentUser.HasRole("Admin");
 
     protected override async Task OnInitializedAsync()

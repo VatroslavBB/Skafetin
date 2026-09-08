@@ -168,6 +168,7 @@ public class AssignmentsController: ControllerBase
             EmployeeId = dto.EmployeeId,
             AssignedAt = dto.AssignedAt,
             AssignmentStatusId = AssignmentStatusActive,
+            AssignedByEmployeeId = GetCurrentEmployeeId(),
             Note = dto.Note?.Trim(),
             CreatedAt = DateTime.Now
         };
@@ -218,7 +219,7 @@ public class AssignmentsController: ControllerBase
             equipment.EquipmentStatusId = EquipmentStatusInStock;
 
         assignment.ReturnedAt = dto.ReturnedAt;
-        assignment.Note = dto.Note!;
+        assignment.ReturnNote = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim();
         assignment.AssignmentStatusId = AssignmentStatusReturned;
 
         EquipmentHistoryWriter.Record(
@@ -284,6 +285,7 @@ public class AssignmentsController: ControllerBase
             AssignedAt = dto.TransferredAt,
             AssignmentStatusId = AssignmentStatusActive,
             PreviousAssignmentId = assignment.Id,
+            AssignedByEmployeeId = GetCurrentEmployeeId(),
             Note = dto.Note,
             CreatedAt = DateTime.Now
         };
@@ -319,6 +321,7 @@ public class AssignmentsController: ControllerBase
         if (equipment.EquipmentStatusId == EquipmentStatusAssigned)
             equipment.EquipmentStatusId = EquipmentStatusInStock;
         assignment.AssignmentStatusId = AssignmentStatusCanceled;
+        assignment.CancelReason = dto.Reason.Trim();
         assignment.ReturnedAt = DateTime.Now;
 
         EquipmentHistoryWriter.Record(
@@ -326,6 +329,12 @@ public class AssignmentsController: ControllerBase
 
         await _context.SaveChangesAsync();
         return NoContent();
+    }
+
+    private int? GetCurrentEmployeeId()
+    {
+        var claim = User.FindFirst(AppClaimTypes.EmployeeId)?.Value;
+        return int.TryParse(claim, out var employeeId) ? employeeId : null;
     }
 
     public static readonly Expression<Func<Assignment, AssignmentDto>> ToDto = a => new AssignmentDto
@@ -341,7 +350,13 @@ public class AssignmentsController: ControllerBase
         AssignmentStatusId = a.AssignmentStatusId,
         AssignmentStatusName = a.AssignmentStatus!.Name,
         PreviousAssignmentId = a.PreviousAssignmentId,
+        AssignedByEmployeeId = a.AssignedByEmployeeId,
+        AssignedByEmployeeFullName = a.AssignedByEmployee == null
+            ? null
+            : a.AssignedByEmployee.FirstName + " " + a.AssignedByEmployee.LastName,
         Note = a.Note,
+        ReturnNote = a.ReturnNote,
+        CancelReason = a.CancelReason,
         CreatedAt = a.CreatedAt
     };
 }

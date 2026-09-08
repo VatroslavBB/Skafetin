@@ -1,5 +1,4 @@
 ﻿@page "/equipment/edit/{Id:int}"
-@attribute [Authorize(Roles = "Admin,AssetManager")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject ISnackbar Snackbar
@@ -37,6 +36,13 @@
                     <MudTextField Label="Model"
                                   @bind-Value="model.Model"
                                   For="@(() => model.Model)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Serijski broj"
+                                  @bind-Value="model.SerialNumber"
+                                  For="@(() => model.SerialNumber)"
+                                  HelperText="Ako je unesen, mora biti jedinstven."
                                   Variant="Variant.Outlined" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
@@ -162,6 +168,7 @@
             Description = data.Description,
             Manufacturer = data.Manufacturer,
             Model = data.Model,
+            SerialNumber = data.SerialNumber,
             EquipmentCategoryId = data.EquipmentCategoryId,
             EquipmentStatusId = data.EquipmentStatusId,
             LocationId = data.LocationId,

@@ -1,5 +1,4 @@
 ﻿@page "/equipment/{Id:int}"
-@attribute [Authorize(Roles = "Admin,AssetManager,LocationResponsible")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject IDialogService DialogService
@@ -94,6 +93,10 @@
                                     <tr>
                                         <td class="mud-text-secondary">Model</td>
                                         <td>@Or(equipment.Model)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Serijski broj</td>
+                                        <td>@Or(equipment.SerialNumber)</td>
                                     </tr>
                                     <tr>
                                         <td class="mud-text-secondary">Nabavna vrijednost</td>
@@ -258,7 +261,17 @@
                                                 </div>
                                             }
                                             <MudCardContent Class="py-2">
-                                                <MudText Typo="Typo.body2"><b>@item.Title</b></MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <b>@item.Title</b>
+                                                    @if (item.IsCover)
+                                                    {
+                                                        <MudChip T="string"
+                                                                 Size="Size.Small"
+                                                                 Color="Color.Primary"
+                                                                 Variant="Variant.Text"
+                                                                 Class="ml-1">Naslovna</MudChip>
+                                                    }
+                                                </MudText>
                                                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
                                                     @item.OriginalFileName &middot; @FormatSize(item.FileSize)
                                                 </MudText>
@@ -272,6 +285,15 @@
                                                 @if (CanManageMedia)
                                                 {
                                                     <MudSpacer />
+                                                    @if (!item.IsCover)
+                                                    {
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Star"
+                                                                       Color="Color.Primary"
+                                                                       Size="Size.Small"
+                                                                       Title="Postavi kao naslovnu"
+                                                                       Disabled="@(busyMediaId == item.Id)"
+                                                                       OnClick="@(() => SetCoverAsync(item))" />
+                                                    }
                                                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                                    Color="Color.Error"
                                                                    Size="Size.Small"
@@ -366,7 +388,7 @@
     private bool isUploading;
     private int? busyMediaId;
 
-    private bool CanManageMedia => CurrentUser.HasAnyRole("Admin", "AssetManager");
+    private bool CanManageMedia => CurrentUser.HasAnyRole("Admin", "InventoryManager");
 
     private List<EquipmentMediaDto> Images =>
         media.Where(m => m.MediaKind == "Image").ToList();
@@ -424,6 +446,23 @@
         else
         {
             Snackbar.Add(result.ErrorMessage ?? "Promjena lokacije nije uspjela.", Severity.Error);
+        }
+    }
+
+    private async Task SetCoverAsync(EquipmentMediaDto item)
+    {
+        busyMediaId = item.Id;
+        var result = await Api.PostAsync<EquipmentMediaDto>($"api/equipmentmedia/{item.Id}/cover", new { });
+        busyMediaId = null;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Naslovna slika je postavljena.", Severity.Success);
+            await LoadMediaAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Postavljanje naslovne slike nije uspjelo.", Severity.Error);
         }
     }
 

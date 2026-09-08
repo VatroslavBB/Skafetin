@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Skafetin.Api.Security;
 using Skafetin.Shared.Models;
 
@@ -14,9 +14,9 @@ public static class AppUserSeeder
     [
         new("admin", "ivana.barisic@skafetin.hr", ["Admin"]),
 
-        new("marko.juric", "marko.juric@skafetin.hr", ["AssetManager", "LocationResponsible"]),
+        new("marko.juric", "marko.juric@skafetin.hr", ["InventoryManager", "LocationResponsible"]),
 
-        new("petra.kovacevic", "petra.kovacevic@skafetin.hr", ["AssetManager"]),
+        new("petra.kovacevic", "petra.kovacevic@skafetin.hr", ["InventoryManager"]),
 
         new("ana.peric", "ana.peric@skafetin.hr", ["LocationResponsible"]),
 

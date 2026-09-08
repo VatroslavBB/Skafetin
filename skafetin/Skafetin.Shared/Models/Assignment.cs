@@ -19,6 +19,12 @@ public class Assignment
     public int? PreviousAssignmentId { get; set; }
     public Assignment? PreviousAssignment { get; set; }
 
+    public int? AssignedByEmployeeId { get; set; }
+    public Employee? AssignedByEmployee { get; set; }
+
     public string? Note { get; set; }
+    public string? ReturnNote { get; set; }
+    public string? CancelReason { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

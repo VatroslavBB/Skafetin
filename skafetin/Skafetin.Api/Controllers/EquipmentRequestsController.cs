@@ -88,7 +88,7 @@ public class EquipmentRequestsController : ControllerBase
         if (request is null)
             return NotFound();
 
-        if (User.IsInRole("Admin") || User.IsInRole("AssetManager"))
+        if (User.IsInRole("Admin") || User.IsInRole("InventoryManager"))
             return Ok(request);
 
         var claim = User.FindFirst(AppClaimTypes.EmployeeId)?.Value;

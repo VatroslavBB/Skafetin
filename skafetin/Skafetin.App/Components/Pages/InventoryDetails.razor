@@ -1,5 +1,4 @@
 ﻿@page "/inventories/{Id:int}"
-@attribute [Authorize(Roles = "Admin,AssetManager,LocationResponsible")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject IDialogService DialogService
@@ -276,7 +275,7 @@
     private string? errorMessage;
     private string? itemsError;
 
-    private bool canLock => CurrentUser.HasAnyRole("Admin", "AssetManager");
+    private bool canLock => CurrentUser.HasAnyRole("Admin", "InventoryManager");
 
     // Popisivati se smije samo dok je inventura otvorena ili u tijeku (pravilo 11).
     private bool canEditItems => inventory is not null

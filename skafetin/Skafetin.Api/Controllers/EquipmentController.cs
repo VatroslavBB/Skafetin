@@ -160,6 +160,7 @@ public class EquipmentController : ControllerBase
                 LocationName = e.Location!.Name,
                 Manufacturer = e.Manufacturer,
                 Model = e.Model,
+                SerialNumber = e.SerialNumber,
                 PurchaseValue = e.PurchaseValue,
                 CreatedAt = e.CreatedAt
             })
@@ -187,6 +188,15 @@ public class EquipmentController : ControllerBase
                 Message = $"Oprema s inventurnim brojem \"{inventoryNumber}\" već postoji."
             });
 
+        var serialNumber = NormalizeSerialNumber(dto.SerialNumber);
+
+        if (serialNumber is not null
+            && await _context.Equipment.AnyAsync(e => e.SerialNumber == serialNumber))
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = $"Oprema sa serijskim brojem \"{serialNumber}\" već postoji."
+            });
+
         var equipment = new Equipment
         {
             Name = dto.Name.Trim(),
@@ -194,6 +204,7 @@ public class EquipmentController : ControllerBase
             Description = dto.Description,
             Manufacturer = dto.Manufacturer,
             Model = dto.Model,
+            SerialNumber = serialNumber,
             EquipmentCategoryId = dto.EquipmentCategoryId,
             EquipmentStatusId = dto.EquipmentStatusId,
             LocationId = dto.LocationId,
@@ -233,6 +244,15 @@ public class EquipmentController : ControllerBase
                 Message = $"Oprema s inventurnim brojem \"{inventoryNumber}\" već postoji."
             });
 
+        var serialNumber = NormalizeSerialNumber(dto.SerialNumber);
+
+        if (serialNumber is not null
+            && await _context.Equipment.AnyAsync(e => e.SerialNumber == serialNumber && e.Id != id))
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = $"Oprema sa serijskim brojem \"{serialNumber}\" već postoji."
+            });
+
         var fromStatusId = equipment.EquipmentStatusId;
         var fromLocationId = equipment.LocationId;
 
@@ -241,6 +261,7 @@ public class EquipmentController : ControllerBase
         equipment.Description = dto.Description;
         equipment.Manufacturer = dto.Manufacturer;
         equipment.Model = dto.Model;
+        equipment.SerialNumber = serialNumber;
         equipment.EquipmentCategoryId = dto.EquipmentCategoryId;
         equipment.EquipmentStatusId = dto.EquipmentStatusId;
         equipment.LocationId = dto.LocationId;
@@ -324,6 +345,12 @@ public class EquipmentController : ControllerBase
         await _context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    private static string? NormalizeSerialNumber(string? serialNumber)
+    {
+        var trimmed = serialNumber?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 
     private async Task<string?> ValidateLookupsAsync(SaveEquipmentDto dto)

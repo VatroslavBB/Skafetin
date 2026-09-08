@@ -433,7 +433,7 @@ public class InventoriesController: ControllerBase
 
     private int? GetRestrictedLocationId()
     {
-        if (User.IsInRole("Admin") || User.IsInRole("AssetManager"))
+        if (User.IsInRole("Admin") || User.IsInRole("InventoryManager"))
             return null;
 
         var claim = User.FindFirst(AppClaimTypes.LocationId)?.Value;
