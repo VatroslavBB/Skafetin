@@ -1,8 +1,145 @@
-﻿@page "/"
+@page "/"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject NavigationManager Navigation
 
-<MudPaper Class="pa-6" Elevation="1">
-    <MudText Typo="Typo.h3" GutterBottom="true">Dobro došli u Škafetin</MudText>
-    <MudText Typo="Typo.body1" Class="mb-4">
-        Ova aplikacija služi za evidenciju imovine unutar objekata Splitsko Dalmatinske županije.
-    </MudText>
-</MudPaper>
+<PageTitle>Početna - Škafetin</PageTitle>
+
+<PageHeader Title="Pregled" Subtitle="Stanje imovine i posljednje promjene" />
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    @if (summary is not null)
+    {
+        @if (summary.Personal is not null)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Moje</MudText>
+            <MudGrid Spacing="2" Class="mb-6">
+                <MudItem xs="6" md="3">
+                    <SummaryCard Label="Zadužena oprema" Value="@summary.Personal.ActiveAssignments" Color="Color.Info" />
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <SummaryCard Label="Otvoreni zahtjevi" Value="@summary.Personal.OpenRequests" Color="Color.Warning" />
+                </MudItem>
+                <MudItem xs="12" md="6" Class="d-flex align-center">
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Laptop"
+                               Class="mr-2"
+                               OnClick="@(() => Navigation.NavigateTo("/my-equipment"))">
+                        Moja oprema
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Outbox"
+                               OnClick="@(() => Navigation.NavigateTo("/my-requests"))">
+                        Moji zahtjevi
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        }
+
+        @if (summary.Global is not null)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Cijela županija</MudText>
+            @RenderOverview(summary.Global)
+        }
+
+        @if (summary.Location is not null)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-2">
+                Moja lokacija: @summary.Location.LocationName
+            </MudText>
+            @RenderOverview(summary.Location)
+        }
+
+        @if (summary.Global is null && summary.Location is null && summary.Personal is null)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                Tvoj račun nema podataka za prikaz na početnoj stranici.
+            </MudAlert>
+        }
+    }
+</LoadingArea>
+
+@code {
+    private DashboardSummaryDto? summary;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<DashboardSummaryDto>("api/dashboard/summary");
+
+        if (result.IsSuccess && result.Data is not null)
+            summary = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat pregleda nije uspio.";
+
+        isLoading = false;
+    }
+
+    private RenderFragment RenderOverview(DashboardOverviewDto overview) =>
+        @<div class="mb-6">
+            <MudGrid Spacing="2" Class="mb-3">
+                <MudItem xs="6" md="2">
+                    <SummaryCard Label="Ukupno opreme" Value="@overview.TotalEquipment" />
+                </MudItem>
+                <MudItem xs="6" md="2">
+                    <SummaryCard Label="Zaduženo" Value="@overview.AssignedEquipment" Color="Color.Info" />
+                </MudItem>
+                <MudItem xs="6" md="2">
+                    <SummaryCard Label="Na servisu" Value="@overview.InServiceEquipment" Color="Color.Warning" />
+                </MudItem>
+                <MudItem xs="6" md="2">
+                    <SummaryCard Label="Nedostaje" Value="@overview.MissingEquipment" Color="Color.Error" />
+                </MudItem>
+                <MudItem xs="6" md="2">
+                    <SummaryCard Label="Otvoreni zahtjevi" Value="@overview.OpenRequests" Color="Color.Warning" />
+                </MudItem>
+                <MudItem xs="6" md="2">
+                    <SummaryCard Label="Inventure u tijeku" Value="@overview.InventoriesInProgress" Color="Color.Info" />
+                </MudItem>
+            </MudGrid>
+
+            <MudPaper Class="pa-4 mb-3" Elevation="0">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">Evidentirana vrijednost opreme</MudText>
+                <MudText Typo="Typo.h5">@overview.TotalPurchaseValue.ToString("N2") EUR</MudText>
+            </MudPaper>
+
+            <MudPaper Class="pa-4" Elevation="0">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Zadnjih pet promjena</MudText>
+
+                @if (overview.RecentActivity.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Još nema zabilježenih promjena.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                        <tbody>
+                            @foreach (var activity in overview.RecentActivity)
+                            {
+                                <tr>
+                                    <td style="width: 130px;">
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@activity.Kind</MudChip>
+                                    </td>
+                                    <td>
+                                        @if (activity.EquipmentId.HasValue)
+                                        {
+                                            <MudLink Href="@($"/equipment/{activity.EquipmentId}")">@activity.Title</MudLink>
+                                        }
+                                        else
+                                        {
+                                            @activity.Title
+                                        }
+                                    </td>
+                                    <td class="mud-text-secondary">@activity.Description</td>
+                                    <td class="mud-text-secondary" style="width: 140px;">
+                                        @activity.OccurredAt.ToString("dd.MM.yyyy. HH:mm")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </div>;
+}
