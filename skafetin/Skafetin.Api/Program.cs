@@ -1,4 +1,5 @@
-﻿using Skafetin.Api.Data;
+﻿using Skafetin.Api.Ai;
+using Skafetin.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -30,6 +31,7 @@ if (jwtOptions.SigningKey.Length < 32)
 
 builder.Services.Configure<JwtOptions>(jwtSection);
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<IAiService, MockAiService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
