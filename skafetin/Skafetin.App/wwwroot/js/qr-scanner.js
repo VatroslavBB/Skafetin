@@ -2,6 +2,7 @@
 window.skafetinQrScanner = {
     _stream: null,
     _timer: null,
+    _canvas: null,
 
     unsupportedReason: function () {
         if (!window.isSecureContext)
@@ -10,8 +11,8 @@ window.skafetinQrScanner = {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
             return "Preglednik ne podržava pristup kameri.";
 
-        if (!("BarcodeDetector" in window))
-            return "Preglednik ne podržava čitanje QR kodova. Koristi Chrome ili Edge.";
+        if (typeof jsQR !== "function")
+            return "Čitač QR kodova nije učitan.";
 
         return null;
     },
@@ -32,26 +33,34 @@ window.skafetinQrScanner = {
         video.srcObject = this._stream;
         await video.play();
 
-        const detector = new BarcodeDetector({ formats: ["qr_code"] });
+        this._canvas = document.createElement("canvas");
+        const context = this._canvas.getContext("2d", { willReadFrequently: true });
         const scanner = this;
 
         this._timer = setInterval(async () => {
             if (video.readyState !== video.HAVE_ENOUGH_DATA)
                 return;
 
-            let codes;
-            try {
-                codes = await detector.detect(video);
-            } catch {
-                return;
-            }
+            // Veci kadar ne pomaze citanju, a osjetno usporava dekodiranje.
+            const width = Math.min(video.videoWidth, 640);
+            const height = Math.round(video.videoHeight * (width / video.videoWidth));
 
-            if (codes.length === 0)
+            if (width === 0 || height === 0)
+                return;
+
+            scanner._canvas.width = width;
+            scanner._canvas.height = height;
+            context.drawImage(video, 0, 0, width, height);
+
+            const image = context.getImageData(0, 0, width, height);
+            const code = jsQR(image.data, width, height, { inversionAttempts: "dontInvert" });
+
+            if (!code || !code.data)
                 return;
 
             scanner.stop();
-            await dotNetRef.invokeMethodAsync("OnCodeDetected", codes[0].rawValue);
-        }, 250);
+            await dotNetRef.invokeMethodAsync("OnCodeDetected", code.data);
+        }, 200);
 
         return null;
     },
@@ -66,6 +75,7 @@ window.skafetinQrScanner = {
             this._stream.getTracks().forEach(track => track.stop());
             this._stream = null;
         }
+
+        this._canvas = null;
     }
 };
-
