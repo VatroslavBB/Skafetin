@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+@using Skafetin.App.Theme
+
+<MudThemeProvider Theme="SkafetinTheme.Instance" @bind-IsDarkMode="isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="skf-auth">
+    <div class="skf-auth-theme">
+        <MudIconButton Icon="@(isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Title="@(isDarkMode ? "Svijetla tema" : "Tamna tema")"
+                       OnClick="@(() => isDarkMode = !isDarkMode)" />
+    </div>
+
+    @Body
+</div>
+
+@code {
+    private bool isDarkMode;
+}

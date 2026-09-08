@@ -1,54 +1,83 @@
 @page "/login"
 @rendermode InteractiveServer
-@layout Skafetin.App.Components.Layout.MainLayout
+@layout Skafetin.App.Components.Layout.LoginLayout
 @inject ApiClient Api
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
-<PageTitle>Prijava</PageTitle>
+<PageTitle>Prijava - Škafetin</PageTitle>
 
-<PageHeader Title="Prijava" Subtitle="Prijavi se svojim korisničkim imenom i lozinkom" />
+<div class="skf-auth-brand">
+    <img src="skafetin-logo-negativ.svg" alt="Škafetin - e-Imovina Županije" class="skf-auth-logo" />
 
-<MudPaper Class="pa-6" Elevation="0" Style="max-width: 460px;">
-    @if (!string.IsNullOrWhiteSpace(errorMessage))
-    {
-        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
-    }
+    <p class="skf-auth-claim">
+        Evidencija opreme, zaduženja i inventura na svim lokacijama županije.
+    </p>
 
-    <EditForm Model="model" OnValidSubmit="SubmitAsync">
-        <DataAnnotationsValidator />
+    <ul class="skf-auth-points">
+        <li>Oprema s cjelovitom poviješću zaduženja</li>
+        <li>Inventure po lokacijama i njihova odstupanja</li>
+        <li>Zahtjevi za opremom i otpis kroz jedan tok</li>
+    </ul>
+</div>
 
-        <MudGrid Spacing="3">
-            <MudItem xs="12">
-                <MudTextField Label="Korisničko ime"
-                              @bind-Value="model.Username"
-                              For="@(() => model.Username)"
-                              Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField Label="Lozinka"
-                              @bind-Value="model.Password"
-                              For="@(() => model.Password)"
-                              InputType="InputType.Password"
-                              Variant="Variant.Outlined" />
-            </MudItem>
-        </MudGrid>
+<div class="skf-auth-form">
+    <MudPaper Class="skf-auth-card pa-8" Elevation="0" Outlined="true">
+        <MudText Typo="Typo.h4" Class="mb-1">Prijava</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
+            Prijavi se korisničkim imenom koje si dobio od administratora.
+        </MudText>
 
-        <div class="d-flex gap-2 mt-6">
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+
+        <EditForm Model="model" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <MudTextField Label="Korisničko ime"
+                          @bind-Value="model.Username"
+                          For="@(() => model.Username)"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.AccountCircle"
+                          Class="mb-4" />
+
+            <MudTextField Label="Lozinka"
+                          @bind-Value="model.Password"
+                          For="@(() => model.Password)"
+                          InputType="@(showPassword ? InputType.Text : InputType.Password)"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          AdornmentAriaLabel="@(showPassword ? "Sakrij lozinku" : "Prikaži lozinku")"
+                          OnAdornmentClick="@(() => showPassword = !showPassword)" />
+
             <MudButton ButtonType="ButtonType.Submit"
                        Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Disabled="isSaving">
+                       Color="Color.Secondary"
+                       Size="Size.Large"
+                       FullWidth="true"
+                       Disabled="isSaving"
+                       Class="mt-6">
                 @(isSaving ? "Provjera..." : "Prijavi se")
             </MudButton>
-        </div>
-    </EditForm>
-</MudPaper>
+        </EditForm>
+    </MudPaper>
+
+    <MudText Typo="Typo.caption" Class="mud-text-secondary mt-4">
+        Račun otvara administrator. Ako ne možeš ući, javi se voditelju imovine.
+    </MudText>
+</div>
 
 @code {
     private LoginRequestDto model = new();
     private bool isSaving;
+    private bool showPassword;
     private string? errorMessage;
 
     // Metoda se ne smije zvati Login - komponentna klasa već nosi to ime (CS0542).
