@@ -5,6 +5,10 @@ namespace Skafetin.Api.Ai;
 
 public class MockAiService : IAiService
 {
+    public string ProviderName => AiOptions.MockProvider;
+    public string ModelName => "Lokalni generator teksta";
+    public bool UsesExternalService => false;
+
     public Task<AiSuggestionDto> SummarizeInventoryAsync(
         InventorySummaryContext context,
         CancellationToken cancellationToken = default)

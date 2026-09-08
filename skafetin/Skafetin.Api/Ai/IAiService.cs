@@ -4,6 +4,10 @@ namespace Skafetin.Api.Ai;
 
 public interface IAiService
 {
+    string ProviderName { get; }
+    string ModelName { get; }
+    bool UsesExternalService { get; }
+
     Task<AiSuggestionDto> SummarizeInventoryAsync(
         InventorySummaryContext context,
         CancellationToken cancellationToken = default);
