@@ -6,7 +6,8 @@
 
 <PageTitle>Uređivanje opreme</PageTitle>
 
-<PageHeader Title="Uređivanje opreme" Subtitle="@subtitle" />
+<PageHeader Title="Uređivanje opreme" Subtitle="@subtitle"
+            Icon="@Icons.Material.Filled.Inventory2" />
 
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
     <MudPaper Class="pa-6" Elevation="0" Style="max-width: 860px;">
@@ -102,7 +103,7 @@
             <div class="d-flex gap-2 mt-6">
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
-                           Color="Color.Primary"
+                           Color="Color.Secondary"
                            Disabled="isSaving">
                     Spremi promjene
                 </MudButton>

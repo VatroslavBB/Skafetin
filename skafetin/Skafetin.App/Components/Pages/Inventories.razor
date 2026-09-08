@@ -7,10 +7,11 @@
 
 <PageTitle>Inventure</PageTitle>
 
-<PageHeader Title="Inventure" Subtitle="Popis inventura po lokacijama">
+<PageHeader Title="Inventure" Subtitle="Popis inventura po lokacijama"
+            Icon="@Icons.Material.Filled.FactCheck">
     <Actions>
         <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
+                   Color="Color.Secondary"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="CreateAsync">
             Nova inventura
@@ -18,7 +19,7 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="3">
             <MudTextField T="string"
@@ -108,7 +109,7 @@
             <MudTd DataLabel="Status">
                 <MudChip T="string"
                          Size="Size.Small"
-                         Color="@StatusColor(context.InventoryStatusName)"
+                         Color="@StatusColors.Inventory(context.InventoryStatusName)"
                          Variant="Variant.Text">
                     @context.InventoryStatusName
                 </MudChip>
@@ -123,7 +124,8 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">Nema inventura koje odgovaraju filtrima.</MudText>
+            <EmptyState Title="Nema inventura za ove filtre"
+                        Description="Promijeni lokaciju ili status, ili očisti filtre." />
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager RowsPerPageString="Redaka po stranici:"
@@ -234,13 +236,4 @@
     private void OpenDetails(InventoryDto inventory)
         => Navigation.NavigateTo($"/inventories/{inventory.Id}");
 
-    private static Color StatusColor(string statusName) => statusName switch
-    {
-        "Skica" => Color.Default,
-        "Otvorena" => Color.Info,
-        "U tijeku" => Color.Warning,
-        "Završena" => Color.Success,
-        "Zaključana" => Color.Dark,
-        _ => Color.Default
-    };
 }

@@ -1,4 +1,4 @@
-@page "/"
+﻿@page "/"
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject NavigationManager Navigation
@@ -74,17 +74,6 @@
     private DashboardSummaryDto? summary;
     private bool isLoading = true;
     private string? errorMessage;
-
-    // Vrijednosti dolaze iz DashboardController.RecentActivity.
-    // U fazi D3 ovo mapiranje seli u zajedničku klasu jer isti nazivi
-    // stoje i na stranicama zaduženja, otpisa i zahtjeva.
-    private static Color KindColor(string kind) => kind switch
-    {
-        "Zaduženje" => Color.Info,
-        "Otpis"     => Color.Error,
-        "Zahtjev"   => Color.Tertiary,
-        _           => Color.Default
-    };
 
     private static string? ShareOfTotal(int part, int total) =>
         total <= 0 ? null : $"{Math.Round(part * 100d / total)} % fonda";
@@ -174,7 +163,7 @@
                                     <td style="width: 130px;">
                                         <MudChip T="string" Size="Size.Small"
                                                  Variant="Variant.Outlined"
-                                                 Color="@KindColor(activity.Kind)">
+                                                 Color="@StatusColors.ActivityKind(activity.Kind)">
                                             @activity.Kind
                                         </MudChip>
                                     </td>

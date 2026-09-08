@@ -7,9 +7,10 @@
 
 <PageTitle>Zahtjevi za opremom</PageTitle>
 
-<PageHeader Title="Zahtjevi za opremom" Subtitle="Obrada zahtjeva zaposlenika za novom ili zamjenskom opremom" />
+<PageHeader Title="Zahtjevi za opremom" Subtitle="Obrada zahtjeva zaposlenika za novom ili zamjenskom opremom"
+            Icon="@Icons.Material.Filled.Mail" />
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="3">
             <MudTextField T="string"
@@ -123,7 +124,7 @@
             <MudTd DataLabel="Status">
                 <MudChip T="string"
                          Size="Size.Small"
-                         Color="@StatusColor(context.RequestStatusId)"
+                         Color="@StatusColors.Request(context.RequestStatusId)"
                          Variant="Variant.Text">
                     @context.RequestStatusName
                 </MudChip>
@@ -156,7 +157,8 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">Nema zahtjeva koji odgovaraju filtrima.</MudText>
+            <EmptyState Title="Nema zahtjeva za ove filtre"
+                        Description="Promijeni status ili kategoriju, ili očisti filtre." />
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager RowsPerPageString="Redaka po stranici:"
@@ -323,14 +325,4 @@
         return statuses.Where(s => allowedIds.Contains(s.Id)).ToList();
     }
 
-    private static Color StatusColor(int statusId) => statusId switch
-    {
-        RequestStatusReceived => Color.Default,
-        RequestStatusInProgress => Color.Info,
-        RequestStatusApproved => Color.Success,
-        RequestStatusRejected => Color.Error,
-        RequestStatusFulfilled => Color.Primary,
-        RequestStatusClosed => Color.Dark,
-        _ => Color.Default
-    };
 }

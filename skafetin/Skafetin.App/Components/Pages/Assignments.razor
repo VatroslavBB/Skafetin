@@ -8,12 +8,13 @@
 
 <PageTitle>Zaduženja</PageTitle>
 
-<PageHeader Title="Zaduženja" Subtitle="Evidencija zaduženja opreme s cjelovitom poviješću">
+<PageHeader Title="Zaduženja" Subtitle="Evidencija zaduženja opreme s cjelovitom poviješću"
+            Icon="@Icons.Material.Filled.AssignmentTurnedIn">
     <Actions>
         @if (canManage)
         {
             <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
+                       Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Navigation.NavigateTo("/assignments/create"))">
                 Novo zaduženje
@@ -22,7 +23,7 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="3">
             <MudTextField T="string"
@@ -123,7 +124,7 @@
             <MudTd DataLabel="Status">
                 <MudChip T="string"
                          Size="Size.Small"
-                         Color="@StatusColor(context.AssignmentStatusName)"
+                         Color="@StatusColors.Assignment(context.AssignmentStatusName)"
                          Variant="Variant.Text">
                     @context.AssignmentStatusName
                 </MudChip>
@@ -155,7 +156,8 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">Nema zaduženja koja odgovaraju filtrima.</MudText>
+            <EmptyState Title="Nema zaduženja za ove filtre"
+                        Description="Promijeni raspon datuma ili status, ili očisti filtre." />
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager RowsPerPageString="Redaka po stranici:"
@@ -323,12 +325,4 @@
 
     private static bool IsActive(AssignmentDto assignment) => assignment.ReturnedAt is null;
 
-    private static Color StatusColor(string statusName) => statusName switch
-    {
-        "Aktivno" => Color.Success,
-        "Vraćeno" => Color.Default,
-        "Premješteno" => Color.Info,
-        "Stornirano" => Color.Error,
-        _ => Color.Default
-    };
 }

@@ -7,10 +7,11 @@
 
 <PageTitle>Zaposlenici</PageTitle>
 
-<PageHeader Title="Zaposlenici" Subtitle="Popis zaposlenika kojima se zadužuje imovina">
+<PageHeader Title="Zaposlenici" Subtitle="Popis zaposlenika kojima se zadužuje imovina"
+            Icon="@Icons.Material.Filled.Badge">
     <Actions>
         <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
+                   Color="Color.Secondary"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="@(() => Navigation.NavigateTo("/employees/create"))">
             Novi zaposlenik
@@ -18,7 +19,7 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="5">
             <MudTextField T="string"
@@ -105,7 +106,8 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">Nema zaposlenika koji odgovaraju filtrima.</MudText>
+            <EmptyState Title="Nema zaposlenika za ove filtre"
+                        Description="Provjeri pretragu i odabrani status, ili očisti filtre." />
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager RowsPerPageString="Redaka po stranici:" />

@@ -7,10 +7,11 @@
 
 <PageTitle>Lokacije</PageTitle>
 
-<PageHeader Title="Lokacije" Subtitle="Popis lokacija na kojima se vodi imovina">
+<PageHeader Title="Lokacije" Subtitle="Popis lokacija na kojima se vodi imovina"
+            Icon="@Icons.Material.Filled.Place">
     <Actions>
         <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
+                   Color="Color.Secondary"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="@(() => Navigation.NavigateTo("/locations/create"))">
             Nova lokacija
@@ -18,7 +19,7 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="5">
             <MudTextField T="string"
@@ -105,7 +106,8 @@
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
-            <MudText Class="pa-4">Nema lokacija koje odgovaraju filtrima.</MudText>
+            <EmptyState Title="Nema lokacija za ove filtre"
+                        Description="Provjeri pretragu, ili očisti filtre." />
         </NoRecordsContent>
         <PagerContent>
             <MudTablePager RowsPerPageString="Redaka po stranici:" />

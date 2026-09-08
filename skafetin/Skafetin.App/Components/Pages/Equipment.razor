@@ -7,10 +7,11 @@
 
 <PageTitle>Oprema</PageTitle>
 
-<PageHeader Title="Oprema" Subtitle="Evidencija opreme s pretragom i filtriranjem na poslužitelju">
+<PageHeader Title="Oprema" Subtitle="Evidencija opreme s pretragom i filtriranjem na poslužitelju"
+            Icon="@Icons.Material.Filled.Inventory2">
     <Actions>
         <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
+                   Color="Color.Secondary"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="@(() => Navigation.NavigateTo("/equipment/create"))">
             Nova oprema
@@ -18,7 +19,7 @@
     </Actions>
 </PageHeader>
 
-<MudPaper Class="pa-4 mb-4" Elevation="0">
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
     <MudGrid Spacing="2" Class="align-center">
         <MudItem xs="12" md="4">
             <MudTextField T="string"
@@ -111,7 +112,7 @@
         <MudTd DataLabel="Status">
             <MudChip T="string"
                      Size="Size.Small"
-                     Color="@StatusColor(context.EquipmentStatusName)"
+                     Color="@StatusColors.Equipment(context.EquipmentStatusName)"
                      Variant="Variant.Text">
                 @context.EquipmentStatusName
             </MudChip>
@@ -132,7 +133,8 @@
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
-        <MudText Class="pa-4">Nema opreme koja odgovara filtrima.</MudText>
+        <EmptyState Title="Nema opreme za ove filtre"
+                        Description="Provjeri pretragu, kategoriju i lokaciju, ili očisti filtre." />
     </NoRecordsContent>
     <PagerContent>
         <MudTablePager RowsPerPageString="Redaka po stranici:"
@@ -261,12 +263,4 @@
         }
     }
 
-    private static Color StatusColor(string statusName) => statusName switch
-    {
-        "Na skladištu" => Color.Success,
-        "Zaduženo" => Color.Info,
-        "Na servisu" => Color.Warning,
-        "Nedostaje" => Color.Error,
-        _ => Color.Default
-    };
 }

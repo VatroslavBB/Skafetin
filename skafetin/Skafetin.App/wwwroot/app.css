@@ -118,6 +118,34 @@ html, body {
     color: var(--mud-palette-secondary);
 }
 
+/* ── Tablice ──────────────────────────────────────────────────────────── */
+
+/* Zaglavlje kao oznaka, ne kao redak podataka: sitno, verzalno, prorijeđeno.
+   Plava crta odvaja zaglavlje od tijela jače nego obična linija tablice. */
+.mud-table-head .mud-table-cell,
+.mud-table-head .mud-table-cell .mud-table-sort-label {
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--mud-palette-text-secondary);
+}
+
+.mud-table-head .mud-table-cell {
+    border-bottom: 2px solid var(--mud-palette-primary);
+    white-space: nowrap;
+}
+
+/* Tablica unutar plohe koja već ima obrub ne treba i vlastiti okvir. */
+.mud-table.mud-table-outlined {
+    border: none;
+}
+
+/* Prazno stanje popunjava širinu tablice, bez razmaka reda. */
+.mud-table .mud-table-empty-row td {
+    padding: 0;
+}
+
 /* ── Brojke ───────────────────────────────────────────────────────────── */
 
 /* Brojke koje se poravnavaju u koloni - iznosi, količine, inventarni brojevi.
