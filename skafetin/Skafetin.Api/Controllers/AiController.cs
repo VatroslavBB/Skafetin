@@ -65,6 +65,62 @@ public class AiController : ControllerBase
         return Ok(suggestion);
     }
 
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
+    [HttpPost("equipment-intake")]
+    public async Task<ActionResult<EquipmentIntakeSuggestionDto>> SuggestEquipmentIntake(
+        AiFreeTextDto dto,
+        CancellationToken cancellationToken)
+    {
+        var categories = await _context.EquipmentCategories
+            .OrderBy(c => c.Name)
+            .Select(c => new LookupDto { Id = c.Id, Name = c.Name })
+            .ToListAsync(cancellationToken);
+
+        var locations = await _context.Locations
+            .OrderBy(l => l.Name)
+            .Select(l => new LookupDto { Id = l.Id, Name = l.Name })
+            .ToListAsync(cancellationToken);
+
+        var suggestion = await _aiService.SuggestEquipmentIntakeAsync(
+            new EquipmentIntakeContext(dto.Text.Trim(), categories, locations),
+            cancellationToken);
+
+        return Ok(suggestion);
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
+    [HttpPost("equipment-check")]
+    public async Task<ActionResult<EquipmentDataCheckDto>> CheckEquipmentData(
+        SaveEquipmentDto dto,
+        CancellationToken cancellationToken)
+    {
+        var categoryName = await _context.EquipmentCategories
+            .Where(c => c.Id == dto.EquipmentCategoryId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var locationName = await _context.Locations
+            .Where(l => l.Id == dto.LocationId)
+            .Select(l => l.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var inventoryNumber = dto.InventoryNumber.Trim();
+
+        var inventoryNumberTaken = !string.IsNullOrWhiteSpace(inventoryNumber)
+            && await _context.Equipment.AnyAsync(e => e.InventoryNumber == inventoryNumber, cancellationToken);
+
+        var serialNumber = dto.SerialNumber?.Trim();
+
+        var serialNumberTaken = !string.IsNullOrWhiteSpace(serialNumber)
+            && await _context.Equipment.AnyAsync(e => e.SerialNumber == serialNumber, cancellationToken);
+
+        var result = await _aiService.CheckEquipmentDataAsync(
+            new EquipmentCheckContext(dto, categoryName, locationName, inventoryNumberTaken, serialNumberTaken),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
     [HttpPost("request-draft")]
     public async Task<ActionResult<AiSuggestionDto>> GetRequestDraft(
         RequestDraftDto dto,

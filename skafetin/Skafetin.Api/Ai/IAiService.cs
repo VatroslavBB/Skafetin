@@ -12,6 +12,14 @@ public interface IAiService
         InventorySummaryContext context,
         CancellationToken cancellationToken = default);
 
+    Task<EquipmentIntakeSuggestionDto> SuggestEquipmentIntakeAsync(
+        EquipmentIntakeContext context,
+        CancellationToken cancellationToken = default);
+
+    Task<EquipmentDataCheckDto> CheckEquipmentDataAsync(
+        EquipmentCheckContext context,
+        CancellationToken cancellationToken = default);
+
     Task<AiSuggestionDto> DraftRequestAsync(
         RequestDraftContext context,
         CancellationToken cancellationToken = default);
@@ -27,3 +35,15 @@ public record RequestDraftContext(
     string Title,
     string CategoryName,
     string? ReplacementEquipmentName);
+
+public record EquipmentIntakeContext(
+    string Text,
+    IReadOnlyList<LookupDto> Categories,
+    IReadOnlyList<LookupDto> Locations);
+
+public record EquipmentCheckContext(
+    SaveEquipmentDto Equipment,
+    string? CategoryName,
+    string? LocationName,
+    bool InventoryNumberTaken,
+    bool SerialNumberTaken);

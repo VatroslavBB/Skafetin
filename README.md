@@ -2,7 +2,7 @@
 
 ## AI prijedlozi
 
-Aplikacija na dva mjesta nudi prijedlog teksta. Prijedlog se korisniku uvijek prikazuje na pregled i **nikad se ne sprema sam** - korisnik ga izričito umeće, uređuje ili odbacuje.
+Aplikacija nudi dvije vrste prijedloga: **slobodan tekst** (sažetak inventure, obrazloženje zahtjeva) i **strukturirani odgovor** (popunjavanje obrasca nove opreme iz bilješke, provjera podataka prije spremanja). Prijedlog se korisniku uvijek prikazuje na pregled i **nikad se ne sprema sam** - korisnik ga izričito umeće, uređuje ili odbacuje, a kod unosa opreme popunjavaju se samo prazna polja.
 
 ### Endpointi i podaci koji se šalju provideru
 
@@ -11,6 +11,8 @@ Aplikacija na dva mjesta nudi prijedlog teksta. Prijedlog se korisniku uvijek pr
 | `GET /api/ai/status` | prijavljen korisnik | ništa; vraća naziv aktivnog providera, model i podatak koristi li se vanjska usluga |
 | `POST /api/ai/inventory-summary/{inventoryId}` | `Manage` | kod inventure, naziv lokacije, je li zaključana i pet brojeva iz sažetka: ukupno, popisano, manjak, oštećeno, krivo mjesto |
 | `POST /api/ai/request-draft` | prijavljen korisnik | naslov zahtjeva, naziv kategorije opreme i naziv zamjenske opreme ako je odabrana |
+| `POST /api/ai/equipment-intake` | `Manage` | bilješka koju je korisnik sam upisao (najviše 4000 znakova) te nazivi kategorija i lokacija, kako bi se prepoznali |
+| `POST /api/ai/equipment-check` | `Manage` | polja obrasca nove opreme i dvije oznake izračunate na API-ju: postoji li već taj inventurni i serijski broj |
 
 Provideru se **ne šalju** osobni podaci zaposlenika, korisnički računi, lozinke ni hashevi, inventurni brojevi pojedinačne opreme ni nabavne vrijednosti. API sam dohvaća podatke iz baze i sastavlja kontekst; `IAiService` ne dobiva pristup `DbContext`-u, pa implementacija ne može proširiti opseg podataka koji izlaze iz aplikacije.
 
