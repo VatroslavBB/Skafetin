@@ -31,7 +31,30 @@ if (jwtOptions.SigningKey.Length < 32)
 
 builder.Services.Configure<JwtOptions>(jwtSection);
 builder.Services.AddScoped<JwtTokenService>();
-builder.Services.AddScoped<IAiService, MockAiService>();
+
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
+builder.Services.AddScoped<MockAiService>();
+
+// Kontroler zna samo za IAiService; konfiguracija odlucuje koja ga klasa izvrsava.
+// Dok postoji samo mock, nepoznat provider se svjesno vraca na njega uz upozorenje,
+// jer je bolje da aplikacija radi s lokalnim generatorom nego da ne krene.
+builder.Services.AddScoped<IAiService>(services =>
+{
+    var provider = builder.Configuration[$"{AiOptions.SectionName}:Provider"];
+
+    if (string.IsNullOrWhiteSpace(provider)
+        || string.Equals(provider, AiOptions.MockProvider, StringComparison.OrdinalIgnoreCase))
+        return services.GetRequiredService<MockAiService>();
+
+    services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Ai")
+        .LogWarning(
+            "Ai:Provider je postavljen na '{Provider}', za koji ne postoji implementacija. Koristi se {Fallback}.",
+            provider,
+            AiOptions.MockProvider);
+
+    return services.GetRequiredService<MockAiService>();
+});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
