@@ -10,6 +10,11 @@
 <PageHeader Title="Oprema" Subtitle="Evidencija opreme s pretragom i filtriranjem na poslužitelju"
             Icon="@Icons.Material.Filled.Inventory2">
     <Actions>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.QrCodeScanner"
+                   OnClick="ScanAsync">
+            Skeniraj
+        </MudButton>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Secondary"
                    StartIcon="@Icons.Material.Filled.Add"
@@ -219,6 +224,17 @@
             Items = result.Data.Items,
             TotalItems = result.Data.TotalCount
         };
+    }
+
+    private async Task ScanAsync()
+    {
+        var dialog = await DialogService.ShowAsync<QrScannerDialog>("Skeniranje QR koda");
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not int equipmentId)
+            return;
+
+        Navigation.NavigateTo($"/equipment/{equipmentId}");
     }
 
     private async Task ReloadAsync()
