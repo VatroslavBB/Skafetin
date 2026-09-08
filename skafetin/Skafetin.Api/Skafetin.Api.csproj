@@ -27,4 +27,10 @@
     <Folder Include="Migrations\" />
   </ItemGroup>
 
+  <!-- Demo datoteke opreme moraju biti uz aplikaciju i nakon objave, jer ih seed
+       kopira u mapu za upload pri prvom pokretanju nad praznom bazom. -->
+  <ItemGroup>
+    <Content Include="SeedFiles\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

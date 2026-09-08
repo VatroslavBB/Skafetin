@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Skafetin.Api.Data;
 using Skafetin.Api.Security;
+using Skafetin.Api.Storage;
 using Skafetin.Shared.DTOs;
 using Skafetin.Shared.Models;
 
@@ -285,17 +286,8 @@ public class EquipmentMediaController : ControllerBase
         return null;
     }
 
-    private string GetUploadDirectory()
-    {
-        var configured = _configuration["Storage:EquipmentMediaPath"];
-
-        if (!string.IsNullOrWhiteSpace(configured))
-            return Path.IsPathRooted(configured)
-                ? configured
-                : Path.Combine(_environment.ContentRootPath, configured);
-
-        return Path.Combine(_environment.ContentRootPath, "uploads", "equipment");
-    }
+    private string GetUploadDirectory() =>
+        MediaStorage.GetUploadDirectory(_configuration, _environment.ContentRootPath);
 
     private int? GetEmployeeIdFromToken()
     {

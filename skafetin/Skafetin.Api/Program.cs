@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Skafetin.Api.Security;
+using Skafetin.Api.Storage;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,7 +73,12 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
 
     var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Seed");
-    await SeedData.SeedAsync(db, seedLogger);
+
+    await SeedData.SeedAsync(
+        db,
+        seedLogger,
+        MediaStorage.GetSeedFilesDirectory(app.Environment.ContentRootPath),
+        MediaStorage.GetUploadDirectory(app.Configuration, app.Environment.ContentRootPath));
 }
 
 // Configure the HTTP request pipeline.
