@@ -25,6 +25,16 @@
                     Natrag
                 </MudButton>
 
+                @if (canLock)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.AutoAwesome"
+                               Disabled="isBusy"
+                               OnClick="ShowAiSummaryAsync">
+                        Sažetak
+                    </MudButton>
+                }
+
                 @if (inventory.InventoryStatusId == StatusDraft)
                 {
                     <MudButton Variant="Variant.Filled"
@@ -409,6 +419,16 @@
         onlyDiscrepancies = false;
 
         await ReloadItemsAsync();
+    }
+
+    private async Task ShowAiSummaryAsync()
+    {
+        var parameters = new DialogParameters<AiSummaryDialog>
+        {
+            { x => x.InventoryId, Id }
+        };
+
+        await DialogService.ShowAsync<AiSummaryDialog>("Prijedlog sažetka inventure", parameters);
     }
 
     private async Task CheckItemAsync(InventoryItemDto item)
