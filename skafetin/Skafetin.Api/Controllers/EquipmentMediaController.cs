@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -65,7 +65,8 @@ public class EquipmentMediaController : ControllerBase
         }
 
         var result = await query
-            .OrderByDescending(m => m.UploadedAt)
+            .OrderByDescending(m => m.IsCover)
+            .ThenByDescending(m => m.UploadedAt)
             .ThenBy(m => m.Id)
             .Select(ToDto)
             .ToListAsync();
@@ -156,6 +157,14 @@ public class EquipmentMediaController : ControllerBase
             UploadedByEmployeeId = GetEmployeeIdFromToken()
         };
 
+        if (allowed.Kind == KindImage)
+        {
+            var hasCover = await _context.EquipmentMedia
+                .AnyAsync(m => m.EquipmentId == equipmentId && m.IsCover);
+
+            media.IsCover = !hasCover;
+        }
+
         try
         {
             _context.EquipmentMedia.Add(media);
@@ -197,6 +206,39 @@ public class EquipmentMediaController : ControllerBase
     }
 
     [Authorize(Policy = AuthorizationPolicies.Manage)]
+    [HttpPost("{id:int}/cover")]
+    public async Task<ActionResult<EquipmentMediaDto>> SetCover(int id)
+    {
+        var media = await _context.EquipmentMedia.FirstOrDefaultAsync(m => m.Id == id);
+        if (media is null)
+            return NotFound();
+
+        if (media.MediaKind != KindImage)
+            return BadRequest(new ErrorResponseDto
+            {
+                Message = "Naslovna može biti samo slika."
+            });
+
+        var currentCovers = await _context.EquipmentMedia
+            .Where(m => m.EquipmentId == media.EquipmentId && m.IsCover && m.Id != media.Id)
+            .ToListAsync();
+
+        foreach (var current in currentCovers)
+            current.IsCover = false;
+
+        media.IsCover = true;
+
+        await _context.SaveChangesAsync();
+
+        var result = await _context.EquipmentMedia
+            .Where(m => m.Id == media.Id)
+            .Select(ToDto)
+            .FirstAsync();
+
+        return Ok(result);
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.Manage)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -205,6 +247,21 @@ public class EquipmentMediaController : ControllerBase
             return NotFound();
 
         _context.EquipmentMedia.Remove(media);
+
+        if (media.IsCover)
+        {
+            var replacement = await _context.EquipmentMedia
+                .Where(m => m.EquipmentId == media.EquipmentId
+                         && m.Id != media.Id
+                         && m.MediaKind == KindImage)
+                .OrderByDescending(m => m.UploadedAt)
+                .ThenBy(m => m.Id)
+                .FirstOrDefaultAsync();
+
+            if (replacement is not null)
+                replacement.IsCover = true;
+        }
+
         await _context.SaveChangesAsync();
 
         var physicalPath = Path.Combine(
@@ -256,6 +313,7 @@ public class EquipmentMediaController : ControllerBase
             InventoryNumber = m.Equipment!.InventoryNumber,
             Title = m.Title,
             MediaKind = m.MediaKind,
+            IsCover = m.IsCover,
             OriginalFileName = m.OriginalFileName,
             ContentType = m.ContentType,
             FileSize = m.FileSize,
