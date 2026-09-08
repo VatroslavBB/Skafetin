@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Skafetin.Api.Data;
 
@@ -10,9 +11,11 @@ using Skafetin.Api.Data;
 namespace Skafetin.Api.Migrations
 {
     [DbContext(typeof(SkafetinDbContext))]
-    partial class SkafetinDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908090428_MissingSchemaChanges")]
+    partial class MissingSchemaChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");

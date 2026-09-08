@@ -21,6 +21,9 @@ public class SaveEquipmentDto
     [StringLength(100, ErrorMessage = "Predugo ime modela.")]
     public string? Model { get; set; }
 
+    [StringLength(100, ErrorMessage = "Predug serijski broj.")]
+    public string? SerialNumber { get; set; }
+
     [Range(1, int.MaxValue, ErrorMessage = "Van definiranih granica.")]
     public int EquipmentCategoryId { get; set; }
 

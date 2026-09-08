@@ -1,4 +1,4 @@
-namespace Skafetin.Shared.DTOs;
+﻿namespace Skafetin.Shared.DTOs;
 
 public class EquipmentMediaDto
 {
@@ -10,6 +10,7 @@ public class EquipmentMediaDto
 
     public string Title { get; set; } = string.Empty;
     public string MediaKind { get; set; } = string.Empty;
+    public bool IsCover { get; set; }
 
     // Naziv koji je stigao od korisnika - sluzi samo za prikaz i preuzimanje.
     public string OriginalFileName { get; set; } = string.Empty;

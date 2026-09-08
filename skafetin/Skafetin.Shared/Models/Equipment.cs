@@ -8,6 +8,7 @@ public class Equipment
     public string? Description { get; set; }
     public string? Manufacturer { get; set; }
     public string? Model { get; set; }
+    public string? SerialNumber { get; set; }
 
     public int EquipmentCategoryId { get; set; }
     public EquipmentCategory? EquipmentCategory { get; set; }

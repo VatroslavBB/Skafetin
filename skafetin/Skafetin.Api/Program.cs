@@ -57,11 +57,11 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(
         AuthorizationPolicies.Manage,
-        policy => policy.RequireRole("Admin", "AssetManager"));
+        policy => policy.RequireRole("Admin", "InventoryManager"));
 
     options.AddPolicy(
         AuthorizationPolicies.InventoryWork,
-        policy => policy.RequireRole("Admin", "AssetManager", "LocationResponsible"));
+        policy => policy.RequireRole("Admin", "InventoryManager", "LocationResponsible"));
 });
 
 var app = builder.Build();

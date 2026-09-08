@@ -1,5 +1,4 @@
 ﻿@page "/users"
-@attribute [Authorize(Roles = "Admin")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject IDialogService DialogService
@@ -382,7 +381,7 @@ else
     private static string RoleLabel(string roleName) => roleName switch
     {
         "Admin" => "Administrator",
-        "AssetManager" => "Voditelj imovine",
+        "InventoryManager" => "Voditelj imovine",
         "LocationResponsible" => "Odgovorna osoba lokacije",
         "Employee" => "Zaposlenik",
         _ => roleName

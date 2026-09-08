@@ -13,7 +13,11 @@ public class AssignmentDto
     public int AssignmentStatusId { get; set; }
     public string AssignmentStatusName { get; set; } = string.Empty;
     public int? PreviousAssignmentId { get; set; }
+    public int? AssignedByEmployeeId { get; set; }
+    public string? AssignedByEmployeeFullName { get; set; }
     public string? Note { get; set; }
+    public string? ReturnNote { get; set; }
+    public string? CancelReason { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

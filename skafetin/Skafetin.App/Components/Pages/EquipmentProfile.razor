@@ -1,5 +1,4 @@
 ﻿@page "/equipment/{Id:int}"
-@attribute [Authorize(Roles = "Admin,AssetManager,LocationResponsible")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject IDialogService DialogService
@@ -366,7 +365,7 @@
     private bool isUploading;
     private int? busyMediaId;
 
-    private bool CanManageMedia => CurrentUser.HasAnyRole("Admin", "AssetManager");
+    private bool CanManageMedia => CurrentUser.HasAnyRole("Admin", "InventoryManager");
 
     private List<EquipmentMediaDto> Images =>
         media.Where(m => m.MediaKind == "Image").ToList();

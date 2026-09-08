@@ -1,5 +1,4 @@
 ﻿@page "/assignments"
-@attribute [Authorize(Roles = "Admin,AssetManager,LocationResponsible")]
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject IDialogService DialogService
@@ -181,7 +180,7 @@
     private bool isLoading = true;
     private string? errorMessage;
 
-    private bool canManage => CurrentUser.HasAnyRole("Admin", "AssetManager");
+    private bool canManage => CurrentUser.HasAnyRole("Admin", "InventoryManager");
 
     protected override async Task OnInitializedAsync()
     {

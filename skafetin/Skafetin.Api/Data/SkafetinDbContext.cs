@@ -1,4 +1,4 @@
-using Skafetin.Shared.Models;
+﻿using Skafetin.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Skafetin.Api.Data;
@@ -44,8 +44,29 @@ public class SkafetinDbContext : DbContext
         modelBuilder.Entity<AppRole>().HasIndex(r => r.Name).IsUnique();
 
         modelBuilder.Entity<Equipment>()
+            .HasIndex(e => e.SerialNumber)
+            .IsUnique()
+            .HasFilter("\"SerialNumber\" IS NOT NULL");
+
+        modelBuilder.Entity<Equipment>()
+            .Property(e => e.SerialNumber)
+            .HasMaxLength(100);
+
+        modelBuilder.Entity<Equipment>()
             .Property(e => e.PurchaseValue)
             .HasColumnType("decimal(18,2)");
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.Note)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.ReturnNote)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.CancelReason)
+            .HasMaxLength(200);
 
         modelBuilder.Entity<Location>()
             .HasOne(l => l.LocationType)
@@ -100,6 +121,12 @@ public class SkafetinDbContext : DbContext
             .WithMany()
             .HasForeignKey(a => a.PreviousAssignmentId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Assignment>()
+            .HasOne(a => a.AssignedByEmployee)
+            .WithMany()
+            .HasForeignKey(a => a.AssignedByEmployeeId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Inventory>()
             .HasOne(i => i.Location)
@@ -288,11 +315,13 @@ public class SkafetinDbContext : DbContext
             new LocationType { Id = 1, Name = "Ured" },
             new LocationType { Id = 2, Name = "Škola" },
             new LocationType { Id = 3, Name = "Zdravstvena ustanova" },
-            new LocationType { Id = 4, Name = "Socijalna ustanova" }
+            new LocationType { Id = 4, Name = "Socijalna ustanova" },
+            new LocationType { Id = 5, Name = "Skladište" },
+            new LocationType { Id = 6, Name = "Terenska lokacija" }
         );
 
         modelBuilder.Entity<EquipmentCategory>().HasData(
-            new EquipmentCategory { Id = 1, Name = "Računalna oprema" },
+            new EquipmentCategory { Id = 1, Name = "Računalo" },
             new EquipmentCategory { Id = 2, Name = "Mrežna oprema" },
             new EquipmentCategory { Id = 3, Name = "Namještaj" },
             new EquipmentCategory { Id = 4, Name = "Alat" },
@@ -317,7 +346,7 @@ public class SkafetinDbContext : DbContext
         );
 
         modelBuilder.Entity<InventoryStatus>().HasData(
-            new InventoryStatus { Id = 1, Name = "Skica" },
+            new InventoryStatus { Id = 1, Name = "Nacrt" },
             new InventoryStatus { Id = 2, Name = "Otvorena" },
             new InventoryStatus { Id = 3, Name = "U tijeku" },
             new InventoryStatus { Id = 4, Name = "Završena" },
@@ -343,7 +372,7 @@ public class SkafetinDbContext : DbContext
 
         modelBuilder.Entity<AppRole>().HasData(
             new AppRole { Id = 1, Name = "Admin" },
-            new AppRole { Id = 2, Name = "AssetManager" },
+            new AppRole { Id = 2, Name = "InventoryManager" },
             new AppRole { Id = 3, Name = "LocationResponsible" },
             new AppRole { Id = 4, Name = "Employee" }
         );
