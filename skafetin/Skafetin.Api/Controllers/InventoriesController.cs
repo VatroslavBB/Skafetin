@@ -481,16 +481,8 @@ public class InventoriesController: ControllerBase
             : i.CheckedByEmployee.FirstName + " " + i.CheckedByEmployee.LastName
     };
 
-    private static readonly Expression<Func<Inventory, InventorySummaryDto>> ToInventorySummaryDto = i => new InventorySummaryDto
-    {
-        Total = i.InventoryItems.Count,
-        Counted = i.InventoryItems.Count(x => x.IsFound != null),
-        Missing = i.InventoryItems.Count(x => x.IsFound == false),
-        Damaged = i.InventoryItems.Count(x => x.IsFound == true && x.IsDamaged),
-        WrongLocation = i.InventoryItems.Count(x => x.IsFound == true
-                                                 && x.FoundLocationId != null
-                                                 && x.FoundLocationId != x.ExpectedLocationId)
-    };
+    private static readonly Expression<Func<Inventory, InventorySummaryDto>> ToInventorySummaryDto =
+        InventoryProjections.ToSummaryDto;
 
     private static readonly Expression<Func<Inventory, InventoryDetailsDto>> ToInventoryDetailsDto = i => new InventoryDetailsDto
     {
