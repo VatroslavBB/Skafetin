@@ -34,24 +34,42 @@ builder.Services.AddScoped<JwtTokenService>();
 
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
 builder.Services.AddScoped<MockAiService>();
+builder.Services.AddScoped<OpenAiService>();
 
 // Kontroler zna samo za IAiService; konfiguracija odlucuje koja ga klasa izvrsava.
-// Dok postoji samo mock, nepoznat provider se svjesno vraca na njega uz upozorenje,
+// Nepoznat provider ili neispravna konfiguracija vracaju se na mock uz upozorenje,
 // jer je bolje da aplikacija radi s lokalnim generatorom nego da ne krene.
 builder.Services.AddScoped<IAiService>(services =>
 {
     var provider = builder.Configuration[$"{AiOptions.SectionName}:Provider"];
+    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("Ai");
 
     if (string.IsNullOrWhiteSpace(provider)
         || string.Equals(provider, AiOptions.MockProvider, StringComparison.OrdinalIgnoreCase))
         return services.GetRequiredService<MockAiService>();
 
-    services.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("Ai")
-        .LogWarning(
-            "Ai:Provider je postavljen na '{Provider}', za koji ne postoji implementacija. Koristi se {Fallback}.",
-            provider,
-            AiOptions.MockProvider);
+    if (string.Equals(provider, AiOptions.OpenAiProvider, StringComparison.OrdinalIgnoreCase))
+    {
+        try
+        {
+            return services.GetRequiredService<OpenAiService>();
+        }
+        catch (InvalidOperationException exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Provider {Provider} nije se mogao stvoriti. Koristi se {Fallback}.",
+                provider,
+                AiOptions.MockProvider);
+
+            return services.GetRequiredService<MockAiService>();
+        }
+    }
+
+    logger.LogWarning(
+        "Ai:Provider je postavljen na '{Provider}', za koji ne postoji implementacija. Koristi se {Fallback}.",
+        provider,
+        AiOptions.MockProvider);
 
     return services.GetRequiredService<MockAiService>();
 });

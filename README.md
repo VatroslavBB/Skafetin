@@ -42,10 +42,12 @@ Povratak na lokalni način:
 dotnet user-secrets set "Ai:Provider" "Mock"
 ```
 
-Nakon ponovnog pokretanja API-ja kartica na početnoj stranici prikazuje aktivni provider. Ako je postavljen provider za koji ne postoji implementacija, aplikacija se vraća na `Mock` i zapisuje upozorenje u log; kartica tada prikazuje `Mock`, jer prikazuje ono što se stvarno izvršava, a ne ono što piše u konfiguraciji.
+Nakon ponovnog pokretanja API-ja kartica na početnoj stranici prikazuje aktivni provider. Ako je postavljen provider za koji ne postoji implementacija, ili nedostaje ključ ili naziv modela, aplikacija se vraća na `Mock` i zapisuje upozorenje u log; kartica tada prikazuje `Mock`, jer prikazuje ono što se stvarno izvršava, a ne ono što piše u konfiguraciji.
+
+Strukturirani odgovori vanjskog providera traže se kroz JSON shemu, a odgovor se nakon dolaska **ponovno provjerava u aplikaciji**: identifikatori kategorije i lokacije moraju postojati u poslanim popisima, negativna vrijednost se odbacuje, duljine polja se skraćuju na dopuštene. Shema jamči oblik odgovora, ne njegovu istinitost.
 
 Zamjenom providera ne mijenjaju se Blazor stranice, DTO modeli ni rute - samo konfiguracija i klasa iza `IAiService`.
 
 ### Poznata ograničenja
 
-Trenutna implementacija je `MockAiService`, generator teksta po predlošku nad podacima iz baze. Nije jezični model i ne zaključuje; služi da aplikacija ima dovršen tok i granicu na kojoj bi vanjski provider stajao.
+Postoje dvije implementacije `IAiService`. `MockAiService` je generator teksta po predlošku nad podacima iz baze - nije jezični model i ne zaključuje. `OpenAiService` šalje podatke iz gornje tablice vanjskoj usluzi. Zadano je uključen mock, pa aplikacija radi bez ključa, internetske veze i troška.
