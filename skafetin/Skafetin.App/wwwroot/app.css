@@ -9,15 +9,24 @@ html, body {
 /* ── Navigacijski stup ────────────────────────────────────────────────── */
 
 /* Aktivna stavka: zlatna oznaka lijevo. Sjena umjesto obruba da se
-   sadržaj ne pomakne za 3px kad stavka postane aktivna. */
-.mud-drawer .mud-nav-link.active:not(.mud-nav-link-disabled) {
+   sadržaj ne pomakne za 3px kad stavka postane aktivna.
+
+   Selektor mora biti specifičniji od MudBlazorovog
+   `.mud-navmenu.mud-navmenu-default .mud-nav-link.active:not(...)` (0,5,0),
+   koji aktivnoj stavci postavlja color: var(--mud-palette-primary).
+   U svijetloj temi to je tamnoplava na tamnoplavom stupcu - 1,25:1. */
+.mud-drawer .mud-navmenu.mud-navmenu-default .mud-nav-link.active:not(.mud-nav-link-disabled),
+.mud-drawer .mud-navmenu .mud-nav-link.active:not(.mud-nav-link-disabled) {
     background-color: rgba(227, 180, 87, .13);
     box-shadow: inset 3px 0 0 0 var(--mud-palette-secondary);
     color: #FFFFFF;
-    font-weight: 500;
 }
 
-.mud-drawer .mud-nav-link.active:not(.mud-nav-link-disabled) .mud-icon-root {
+.mud-drawer .mud-navmenu .mud-nav-link.active:not(.mud-nav-link-disabled) .mud-nav-link-text {
+    color: #FFFFFF;
+}
+
+.mud-drawer .mud-navmenu .mud-nav-link.active:not(.mud-nav-link-disabled) .mud-icon-root {
     color: var(--mud-palette-secondary);
 }
 
@@ -42,6 +51,71 @@ html, body {
 /* Traka je svijetla, pa joj treba crta umjesto sjene. */
 .mud-appbar {
     border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+/* ── Kartica sažetka ──────────────────────────────────────────────────── */
+
+/* Traka nosi značenje statusa. Kroz ::before, a ne border-left, da se
+   sadržaj kartice ne pomakne i da radius ostane netaknut. */
+.skf-card {
+    position: relative;
+    overflow: hidden;
+    padding-left: 16px !important;
+}
+
+.skf-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--skf-stripe, var(--mud-palette-lines-default));
+}
+
+/* ── Zaglavlje stranice ───────────────────────────────────────────────── */
+
+.skf-page-icon {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--mud-default-borderradius);
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-secondary);
+    display: grid;
+    place-items: center;
+}
+
+.skf-page-icon .mud-icon-root {
+    color: inherit;
+}
+
+/* ── Prazno stanje ────────────────────────────────────────────────────── */
+
+.skf-empty {
+    text-align: center;
+}
+
+.skf-empty-mark {
+    width: 52px;
+    height: 52px;
+    opacity: .28;
+}
+
+/* ── Ploha s glavnom brojkom ──────────────────────────────────────────── */
+
+/* Namjerno ista ploha kao navigacijski stup, a ne Primary: u tamnoj temi
+   Primary postane svijetloplav, pa bi zlatna brojka na njemu pala u kontrastu.
+   drawer-background je taman u obje teme. */
+.skf-highlight {
+    background: var(--mud-palette-drawer-background);
+    color: #FFFFFF;
+}
+
+.skf-highlight .skf-highlight-label {
+    color: rgba(255, 255, 255, .72);
+}
+
+.skf-highlight .skf-highlight-value {
+    color: var(--mud-palette-secondary);
 }
 
 /* ── Brojke ───────────────────────────────────────────────────────────── */

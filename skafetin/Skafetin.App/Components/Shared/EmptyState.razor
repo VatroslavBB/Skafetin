@@ -1,0 +1,25 @@
+
+
+<div class="skf-empty pa-8 d-flex flex-column align-center">
+    <img src="skafetin-znak.svg" alt="" class="skf-empty-mark mb-3" />
+
+    <MudText Typo="Typo.subtitle1">@Title</MudText>
+
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">@Description</MudText>
+    }
+
+    @if (Actions is not null)
+    {
+        <div class="d-flex gap-2 mt-4">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string? Description { get; set; }
+
+    [Parameter] public RenderFragment? Actions { get; set; }
+}
