@@ -70,8 +70,33 @@
     }
 </LoadingArea>
 
+@if (aiStatus is not null)
+{
+    <MudPaper Class="pa-3 mt-2" Elevation="0" Outlined="true">
+        <div class="d-flex align-center gap-3">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                     Color="@(aiStatus.UsesExternalService ? Color.Warning : Color.Default)" />
+            <div>
+                <MudText Typo="Typo.body2">
+                    AI prijedlozi: <b>@aiStatus.Provider</b>
+                    @if (!string.IsNullOrWhiteSpace(aiStatus.Model))
+                    {
+                        <span> · @aiStatus.Model</span>
+                    }
+                </MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @(aiStatus.UsesExternalService
+                        ? "Podaci se šalju vanjskoj usluzi. Prijedlog uvijek pregledaj prije primjene."
+                        : "Prijedlozi nastaju lokalno, bez slanja podataka izvan aplikacije.")
+                </MudText>
+            </div>
+        </div>
+    </MudPaper>
+}
+
 @code {
     private DashboardSummaryDto? summary;
+    private AiProviderStatusDto? aiStatus;
     private bool isLoading = true;
     private string? errorMessage;
 
@@ -86,6 +111,11 @@
             summary = result.Data;
         else
             errorMessage = result.ErrorMessage ?? "Dohvat pregleda nije uspio.";
+
+        var statusResult = await Api.GetAsync<AiProviderStatusDto>("api/ai/status");
+
+        if (statusResult.IsSuccess)
+            aiStatus = statusResult.Data;
 
         isLoading = false;
     }

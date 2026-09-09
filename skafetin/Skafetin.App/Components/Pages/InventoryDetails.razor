@@ -32,6 +32,15 @@
                                Disabled="isBusy"
                                OnClick="ScanItemAsync">
                         Skeniraj
+                      <MudButton>
+                }
+                @if (canLock)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.AutoAwesome"
+                               Disabled="isBusy"
+                               OnClick="ShowAiSummaryAsync">
+                        Sažetak
                     </MudButton>
                 }
 
@@ -463,6 +472,16 @@
             Snackbar.Add($"Oprema \"{equipment.Name}\" ({equipment.InventoryNumber}) nije u ovoj inventuri.", Severity.Warning);
 
         return item;
+    }
+          
+    private async Task ShowAiSummaryAsync()
+    {
+        var parameters = new DialogParameters<AiSummaryDialog>
+        {
+            { x => x.InventoryId, Id }
+        };
+
+        await DialogService.ShowAsync<AiSummaryDialog>("Prijedlog sažetka inventure", parameters);
     }
 
     private async Task CheckItemAsync(InventoryItemDto item)

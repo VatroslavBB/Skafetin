@@ -1,0 +1,74 @@
+@inject ApiClient Api
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="mr-2" />
+            Prijedlog sažetka inventure
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage" Rows="4">
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true" Style="max-width: 560px;">
+                <MudText Typo="Typo.body1">@suggestion?.Text</MudText>
+            </MudPaper>
+
+            <MudText Typo="Typo.caption" Class="mud-text-secondary mt-3">
+                Prijedlog nastaje iz brojeva inventure i služi kao nacrt zapisnika. Prije uporabe ga pregledaj.
+            </MudText>
+        </LoadingArea>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Zatvori</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ContentCopy"
+                   Disabled="@(suggestion is null)"
+                   OnClick="CopyAsync">
+            Kopiraj
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public int InventoryId { get; set; }
+
+    private AiSuggestionDto? suggestion;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.PostAsync<AiSuggestionDto>(
+            $"api/ai/inventory-summary/{InventoryId}", new { });
+
+        if (result.IsSuccess && result.Data is not null)
+            suggestion = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Prijedlog nije dohvaćen.";
+
+        isLoading = false;
+    }
+
+    private async Task CopyAsync()
+    {
+        if (suggestion is null)
+            return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", suggestion.Text);
+            Snackbar.Add("Sažetak je kopiran.", Severity.Success);
+        }
+        catch (JSException)
+        {
+            Snackbar.Add("Kopiranje nije uspjelo, označi tekst i kopiraj ručno.", Severity.Warning);
+        }
+    }
+
+    private void Close() => MudDialog.Cancel();
+}
