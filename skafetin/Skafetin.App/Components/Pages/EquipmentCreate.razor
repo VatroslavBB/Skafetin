@@ -123,6 +123,7 @@
                                @bind-Value="model.EquipmentCategoryId"
                                For="@(() => model.EquipmentCategoryId)"
                                Variant="Variant.Outlined">
+                        <MudSelectItem T="int" Value="0" Disabled="true">Odaberi kategoriju</MudSelectItem>
                         @foreach (var category in categories)
                         {
                             <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
@@ -147,6 +148,7 @@
                                @bind-Value="model.LocationId"
                                For="@(() => model.LocationId)"
                                Variant="Variant.Outlined">
+                        <MudSelectItem T="int" Value="0" Disabled="true">Odaberi lokaciju</MudSelectItem>
                         @foreach (var location in locations)
                         {
                             <MudSelectItem T="int" Value="@location.Id">@location.Name</MudSelectItem>
@@ -159,6 +161,7 @@
                                      @bind-Value="model.PurchaseValue"
                                      For="@(() => model.PurchaseValue)"
                                      Min="0"
+                                     Max="1000000"
                                      Format="0.00"
                                      Variant="Variant.Outlined" />
                 </MudItem>
