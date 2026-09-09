@@ -1,0 +1,692 @@
+﻿@page "/equipment/{Id:int}"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject CurrentUserService CurrentUser
+@inject IJSRuntime JS
+
+<PageTitle>@(equipment?.Name ?? "Oprema")</PageTitle>
+
+<PageHeader Title="@(equipment?.Name ?? "Oprema")" Subtitle="@equipment?.InventoryNumber"
+            Icon="@Icons.Material.Filled.Inventory2"
+            Breadcrumbs="@(new List<BreadcrumbItem>
+                {
+                    new("Oprema", "/equipment"),
+                    new(equipment?.Name ?? "Detalji", null, disabled: true)
+                })">
+    <Actions>
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   OnClick="@(() => Navigation.NavigateTo("/equipment"))">
+            Natrag na popis
+        </MudButton>
+        @if (equipment is not null)
+        {
+            @if (CanManageMedia)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.MoveDown"
+                           OnClick="MoveAsync">
+                    Premjesti
+                </MudButton>
+            }
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.QrCode2"
+                       OnClick="ShowQrCodeAsync">
+                QR kod
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="@(() => Navigation.NavigateTo($"/equipment/edit/{Id}"))">
+                Uredi
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteAsync">
+                Obriši
+            </MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    @if (equipment is not null)
+    {
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-6">
+
+                <MudTabPanel Text="Podaci" Icon="@Icons.Material.Filled.Description">
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSimpleTable Dense="true" Hover="false" Elevation="0">
+                                <tbody>
+                                    <tr>
+                                        <td class="mud-text-secondary" style="width: 45%;">Inventurni broj</td>
+                                        <td>@equipment.InventoryNumber</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Naziv</td>
+                                        <td>@equipment.Name</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Kategorija</td>
+                                        <td>@equipment.EquipmentCategoryName</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Status</td>
+                                        <td>
+                                            <MudChip T="string"
+                                                     Size="Size.Small"
+                                                     Color="@StatusColors.Equipment(equipment.EquipmentStatusName)"
+                                                     Variant="Variant.Text">
+                                                @equipment.EquipmentStatusName
+                                            </MudChip>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Lokacija</td>
+                                        <td>@equipment.LocationName</td>
+                                    </tr>
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSimpleTable Dense="true" Hover="false" Elevation="0">
+                                <tbody>
+                                    <tr>
+                                        <td class="mud-text-secondary" style="width: 45%;">Proizvođač</td>
+                                        <td>@Or(equipment.Manufacturer)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Model</td>
+                                        <td>@Or(equipment.Model)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Serijski broj</td>
+                                        <td>@Or(equipment.SerialNumber)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Nabavna vrijednost</td>
+                                        <td>@(equipment.PurchaseValue.HasValue ? $"{equipment.PurchaseValue.Value:N2} EUR" : "-")</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="mud-text-secondary">Uneseno u evidenciju</td>
+                                        <td>@equipment.CreatedAt.ToString("dd.MM.yyyy.")</td>
+                                    </tr>
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Opis</MudText>
+                            <MudText Typo="Typo.body2">@Or(equipment.Description)</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Zaduženja" Icon="@Icons.Material.Filled.AssignmentTurnedIn">
+                    
+                    @if (assignmentsError is not null)
+                    {
+                        <MudAlert Severity="Severity.Error">@assignmentsError</MudAlert>
+                    }
+                    else if (assignments.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Ova oprema još nije bila zadužena.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable T="AssignmentDto" Items="assignments" Hover="true" Dense="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Zaposlenik</MudTh>
+                                <MudTh>Zaduženo</MudTh>
+                                <MudTh>Zatvoreno</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Napomena</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Zaposlenik">@context.EmployeeFullName</MudTd>
+                                <MudTd DataLabel="Zaduženo">@context.AssignedAt.ToString("dd.MM.yyyy.")</MudTd>
+                                <MudTd DataLabel="Zatvoreno">
+                                    @(context.ReturnedAt.HasValue ? context.ReturnedAt.Value.ToString("dd.MM.yyyy.") : "-")
+                                </MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string"
+                                             Size="Size.Small"
+                                             Color="@StatusColors.Assignment(context.AssignmentStatusName)"
+                                             Variant="Variant.Text">
+                                        @context.AssignmentStatusName
+                                    </MudChip>
+                                    @if (context.PreviousAssignmentId.HasValue)
+                                    {
+                                        <MudTooltip Text="Nastalo prijenosom s prethodnog zaduženja">
+                                            <MudIcon Icon="@Icons.Material.Filled.SubdirectoryArrowRight"
+                                                     Size="Size.Small"
+                                                     Class="ml-1 mud-text-secondary" />
+                                        </MudTooltip>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Napomena">@Or(context.Note)</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="Dokumenti" Icon="@Icons.Material.Filled.AttachFile">
+
+                    @if (CanManageMedia)
+                    {
+                        <MudPaper Class="pa-4 mb-4" Outlined="true" Elevation="0">
+                            <MudGrid Spacing="2" Class="align-center">
+                                <MudItem xs="12" md="3">
+                                    <MudFileUpload T="IBrowserFile"
+                                                   FilesChanged="OnFileChanged"
+                                                   Accept="image/jpeg,image/png,image/webp,application/pdf">
+                                        <ActivatorContent>
+                                            <MudButton Variant="Variant.Outlined"
+                                                       StartIcon="@Icons.Material.Filled.UploadFile">
+                                                Odaberi datoteku
+                                            </MudButton>
+                                        </ActivatorContent>
+                                    </MudFileUpload>
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField @bind-Value="uploadTitle"
+                                                  Label="Naslov"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  MaxLength="150" />
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudSelect @bind-Value="uploadKind"
+                                               Label="Vrsta"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense">
+                                        <MudSelectItem Value="@("Image")">Slika</MudSelectItem>
+                                        <MudSelectItem Value="@("Document")">Dokument</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" md="2">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               FullWidth="true"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               Disabled="@(selectedFile is null || isUploading)"
+                                               OnClick="UploadAsync">
+                                        @(isUploading ? "Prilažem..." : "Priloži")
+                                    </MudButton>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @if (selectedFile is not null)
+                                        {
+                                            <b>@selectedFile.Name</b>
+                                            <span> (@FormatSize(selectedFile.Size))</span>
+                                            <span> &middot; </span>
+                                        }
+                                        <span>Slike JPG, PNG i WEBP do 5 MB; dokumenti PDF do 10 MB.</span>
+                                    </MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+
+                    @if (mediaError is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-4">@mediaError</MudAlert>
+                    }
+
+                    @if (isMediaLoading)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    }
+                    else if (media.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Uz ovu opremu još nema priloženih datoteka.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        @if (Images.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Slike</MudText>
+                            <MudGrid Spacing="3" Class="mb-4">
+                                @foreach (var item in Images)
+                                {
+                                    <MudItem xs="12" sm="6" md="4" lg="3">
+                                        <MudCard Outlined="true" Elevation="0">
+                                            @if (previews.TryGetValue(item.Id, out var dataUrl))
+                                            {
+                                                <MudCardMedia Image="@dataUrl" Height="160" />
+                                            }
+                                            else
+                                            {
+                                                <div style="height:160px;" class="d-flex align-center justify-center">
+                                                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                                                </div>
+                                            }
+                                            <MudCardContent Class="py-2">
+                                                <MudText Typo="Typo.body2">
+                                                    <b>@item.Title</b>
+                                                    @if (item.IsCover)
+                                                    {
+                                                        <MudChip T="string"
+                                                                 Size="Size.Small"
+                                                                 Color="Color.Primary"
+                                                                 Variant="Variant.Text"
+                                                                 Class="ml-1">Naslovna</MudChip>
+                                                    }
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                    @item.OriginalFileName &middot; @FormatSize(item.FileSize)
+                                                </MudText>
+                                            </MudCardContent>
+                                            <MudCardActions>
+                                                <MudButton Size="Size.Small"
+                                                           StartIcon="@Icons.Material.Filled.OpenInNew"
+                                                           OnClick="@(() => OpenAsync(item))">
+                                                    Otvori
+                                                </MudButton>
+                                                @if (CanManageMedia)
+                                                {
+                                                    <MudSpacer />
+                                                    @if (!item.IsCover)
+                                                    {
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Star"
+                                                                       Color="Color.Primary"
+                                                                       Size="Size.Small"
+                                                                       Title="Postavi kao naslovnu"
+                                                                       Disabled="@(busyMediaId == item.Id)"
+                                                                       OnClick="@(() => SetCoverAsync(item))" />
+                                                    }
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Disabled="@(busyMediaId == item.Id)"
+                                                                   OnClick="@(() => DeleteMediaAsync(item))" />
+                                                }
+                                            </MudCardActions>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        }
+
+                        @if (Documents.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Dokumenti</MudText>
+                            <MudTable T="EquipmentMediaDto" Items="Documents" Hover="true" Dense="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Naslov</MudTh>
+                                    <MudTh>Datoteka</MudTh>
+                                    <MudTh>Veličina</MudTh>
+                                    <MudTh>Priloženo</MudTh>
+                                    <MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Naslov">@context.Title</MudTd>
+                                    <MudTd DataLabel="Datoteka">@context.OriginalFileName</MudTd>
+                                    <MudTd DataLabel="Veličina">@FormatSize(context.FileSize)</MudTd>
+                                    <MudTd DataLabel="Priloženo">
+                                        @context.UploadedAt.ToLocalTime().ToString("dd.MM.yyyy.")
+                                        @if (!string.IsNullOrWhiteSpace(context.UploadedByEmployeeFullName))
+                                        {
+                                            <span class="mud-text-secondary"> &middot; @context.UploadedByEmployeeFullName</span>
+                                        }
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudButton Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                                                   OnClick="@(() => OpenAsync(context))">
+                                            Otvori
+                                        </MudButton>
+                                        @if (CanManageMedia)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                           Color="Color.Error"
+                                                           Size="Size.Small"
+                                                           Disabled="@(busyMediaId == context.Id)"
+                                                           OnClick="@(() => DeleteMediaAsync(context))" />
+                                        }
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    }
+                </MudTabPanel>
+
+            </MudTabs>
+        </MudPaper>
+    }
+</LoadingArea>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EquipmentDetailsDto? equipment;
+    private List<AssignmentDto> assignments = new();
+
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? assignmentsError;
+
+    private const long MaxImageSize = 5 * 1024 * 1024;
+    private const long MaxDocumentSize = 10 * 1024 * 1024;
+
+    private static readonly Dictionary<string, string> AllowedContentTypes = new()
+    {
+        ["image/jpeg"] = "Image",
+        ["image/png"] = "Image",
+        ["image/webp"] = "Image",
+        ["application/pdf"] = "Document"
+    };
+
+    private List<EquipmentMediaDto> media = new();
+    private readonly Dictionary<int, string> previews = new();
+
+    private bool isMediaLoading;
+    private string? mediaError;
+
+    private IBrowserFile? selectedFile;
+    private string uploadTitle = string.Empty;
+    private string uploadKind = "Image";
+    private bool isUploading;
+    private int? busyMediaId;
+
+    private bool CanManageMedia => CurrentUser.HasAnyRole("Admin", "InventoryManager");
+
+    private List<EquipmentMediaDto> Images =>
+        media.Where(m => m.MediaKind == "Image").ToList();
+
+    private List<EquipmentMediaDto> Documents =>
+        media.Where(m => m.MediaKind == "Document").ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var result = await Api.GetAsync<EquipmentDetailsDto>($"api/equipment/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+            equipment = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Oprema nije pronađena.";
+
+        isLoading = false;
+
+        if (equipment is not null)
+        {
+            await LoadAssignmentsAsync();
+            await LoadMediaAsync();
+        }
+    }
+
+    private async Task ShowQrCodeAsync()
+    {
+        if (equipment is null)
+            return;
+
+        var parameters = new DialogParameters<EquipmentQrDialog>
+        {
+            { x => x.EquipmentId, equipment.Id },
+            { x => x.InventoryNumber, equipment.InventoryNumber },
+            { x => x.EquipmentName, equipment.Name }
+        };
+
+        await DialogService.ShowAsync<EquipmentQrDialog>("QR kod opreme", parameters);
+    }
+
+    private async Task MoveAsync()
+    {
+        if (equipment is null)
+            return;
+
+        var parameters = new DialogParameters<MoveEquipmentDialog>
+        {
+            { x => x.CurrentLocationId, equipment.LocationId },
+            { x => x.CurrentLocationName, equipment.LocationName },
+            { x => x.InventoryNumber, equipment.InventoryNumber },
+            { x => x.EquipmentName, equipment.Name }
+        };
+
+        var dialog = await DialogService.ShowAsync<MoveEquipmentDialog>("Promjena lokacije", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not MoveEquipmentDto dto)
+            return;
+
+        var result = await Api.PostAsync<EquipmentDto>($"api/equipment/{Id}/move", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Lokacija opreme je promijenjena.", Severity.Success);
+            await OnParametersSetAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Promjena lokacije nije uspjela.", Severity.Error);
+        }
+    }
+
+    private async Task SetCoverAsync(EquipmentMediaDto item)
+    {
+        busyMediaId = item.Id;
+        var result = await Api.PostAsync<EquipmentMediaDto>($"api/equipmentmedia/{item.Id}/cover", new { });
+        busyMediaId = null;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Naslovna slika je postavljena.", Severity.Success);
+            await LoadMediaAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Postavljanje naslovne slike nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private async Task LoadMediaAsync()
+    {
+        isMediaLoading = true;
+        mediaError = null;
+        previews.Clear();
+
+        var result = await Api.GetAsync<List<EquipmentMediaDto>>($"api/equipmentmedia/equipment/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+            media = result.Data;
+        else
+            mediaError = result.ErrorMessage ?? "Dohvat priloženih datoteka nije uspio.";
+
+        isMediaLoading = false;
+
+        foreach (var image in Images)
+            await LoadPreviewAsync(image);
+    }
+
+    private async Task LoadPreviewAsync(EquipmentMediaDto item)
+    {
+        if (previews.ContainsKey(item.Id))
+            return;
+
+        var result = await Api.GetBytesAsync($"api/equipmentmedia/{item.Id}/content");
+
+        if (result.IsSuccess && result.Data is not null)
+        {
+            previews[item.Id] = $"data:{item.ContentType};base64,{Convert.ToBase64String(result.Data)}";
+            StateHasChanged();
+        }
+    }
+
+    private void OnFileChanged(IBrowserFile? file)
+    {
+        selectedFile = file;
+
+        if (file is null)
+            return;
+
+        if (AllowedContentTypes.TryGetValue(file.ContentType, out var kind))
+            uploadKind = kind;
+
+        if (string.IsNullOrWhiteSpace(uploadTitle))
+            uploadTitle = Path.GetFileNameWithoutExtension(file.Name);
+    }
+
+    private async Task UploadAsync()
+    {
+        if (selectedFile is null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(uploadTitle))
+        {
+            Snackbar.Add("Upiši naslov datoteke.", Severity.Warning);
+            return;
+        }
+
+        if (!AllowedContentTypes.TryGetValue(selectedFile.ContentType, out var kind))
+        {
+            Snackbar.Add("Dopuštene su slike (JPG, PNG, WEBP) i PDF dokumenti.", Severity.Warning);
+            return;
+        }
+
+        var maxSize = kind == "Image" ? MaxImageSize : MaxDocumentSize;
+
+        if (selectedFile.Size > maxSize)
+        {
+            Snackbar.Add(
+                kind == "Image"
+                    ? "Slika smije imati najviše 5 MB."
+                    : "Dokument smije imati najviše 10 MB.",
+                Severity.Warning);
+            return;
+        }
+
+        isUploading = true;
+
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            await using var stream = selectedFile.OpenReadStream(maxSize);
+            using var fileContent = new StreamContent(stream);
+
+            fileContent.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue(selectedFile.ContentType);
+
+            form.Add(fileContent, "file", selectedFile.Name);
+            form.Add(new StringContent(uploadTitle.Trim()), "title");
+            form.Add(new StringContent(uploadKind), "kind");
+
+            var result = await Api.PostFormAsync<EquipmentMediaDto>(
+                $"api/equipmentmedia/equipment/{Id}",
+                form);
+
+            if (result.IsSuccess)
+            {
+                Snackbar.Add("Datoteka je priložena.", Severity.Success);
+                selectedFile = null;
+                uploadTitle = string.Empty;
+                await LoadMediaAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.ErrorMessage ?? "Prilaganje datoteke nije uspjelo.", Severity.Error);
+            }
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task OpenAsync(EquipmentMediaDto item)
+    {
+        var result = await Api.GetBytesAsync($"api/equipmentmedia/{item.Id}/content");
+
+        if (!result.IsSuccess || result.Data is null)
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Datoteka nije dostupna.", Severity.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync(
+            "skafetinFiles.open",
+            Convert.ToBase64String(result.Data),
+            item.ContentType,
+            item.OriginalFileName);
+    }
+
+    private async Task DeleteMediaAsync(EquipmentMediaDto item)
+    {
+        if (!await DialogService.ConfirmDeleteAsync($"Datoteka \"{item.Title}\""))
+            return;
+
+        busyMediaId = item.Id;
+
+        var result = await Api.DeleteAsync($"api/equipmentmedia/{item.Id}");
+
+        busyMediaId = null;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Datoteka je obrisana.", Severity.Success);
+            await LoadMediaAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Brisanje nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+            return $"{bytes / 1024d / 1024d:N1} MB";
+
+        return $"{bytes / 1024d:N0} KB";
+    }
+
+    private async Task LoadAssignmentsAsync()
+    {
+        assignmentsError = null;
+
+        var result = await Api.GetAsync<List<AssignmentDto>>($"api/assignments/equipment/{Id}");
+
+        if (result.IsSuccess && result.Data is not null)
+            assignments = result.Data;
+        else
+            assignmentsError = result.ErrorMessage ?? "Dohvat povijesti zaduženja nije uspio.";
+    }
+
+
+    private async Task DeleteAsync()
+    {
+        if (equipment is null)
+            return;
+
+        if (!await DialogService.ConfirmDeleteAsync($"Oprema \"{equipment.Name}\" ({equipment.InventoryNumber})"))
+            return;
+
+        var result = await Api.DeleteAsync($"api/equipment/{Id}");
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Oprema je obrisana.", Severity.Success);
+            Navigation.NavigateTo("/equipment");
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Brisanje nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private static string Or(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+}
+

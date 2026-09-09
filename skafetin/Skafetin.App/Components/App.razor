@@ -1,18 +1,21 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="hr">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <ResourcePreloader />
-    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
-    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" />
     <link rel="stylesheet" href="@Assets["Skafetin.App.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet @rendermode="InteractiveServer"/>
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="@Assets["app.css"]" />
 </head>
 
 <body>
@@ -20,6 +23,10 @@
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="@Assets["js/skafetin-files.js"]"></script>
+    <script src="@Assets["js/jsQR.js"]"></script>
+    <script src="@Assets["js/qr-scanner.js"]"></script>
 </body>
 
 </html>
+

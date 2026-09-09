@@ -1,0 +1,61 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" />
+            Realizacija zahtjeva
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Request.Title<br />
+            Kategorija: @Request.EquipmentCategoryName<br />
+            Podnositelj: @Request.RequestedByEmployeeFullName
+        </MudText>
+
+        <MudSelect T="int?"
+                   @bind-Value="equipmentId"
+                   Label="Dodijeljena oprema"
+                   HelperText="Prikazana je samo oprema na skladištu."
+                   Variant="Variant.Outlined">
+            @foreach (var equipment in Equipment)
+            {
+                <MudSelectItem T="int?" Value="@equipment.Id">@equipment.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@validationMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Realiziraj</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public EquipmentRequestDto Request { get; set; } = default!;
+    [Parameter, EditorRequired] public List<LookupDto> Equipment { get; set; } = new();
+
+    private int? equipmentId;
+    private string? validationMessage;
+
+    private void Submit()
+    {
+        if (equipmentId is null)
+        {
+            validationMessage = "Odaberite opremu.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new FulfillRequestDto
+        {
+            EquipmentId = equipmentId.Value
+        }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

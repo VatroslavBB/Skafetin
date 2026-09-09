@@ -1,0 +1,148 @@
+﻿@page "/employees/edit/{Id:int}"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Uređivanje zaposlenika</PageTitle>
+
+<PageHeader Title="Uređivanje zaposlenika" Subtitle="@subtitle"
+            Icon="@Icons.Material.Filled.Badge" />
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudPaper Class="pa-6" Elevation="0" Style="max-width: 720px;">
+        <EditForm Model="model" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Ime"
+                                  @bind-Value="model.FirstName"
+                                  For="@(() => model.FirstName)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Prezime"
+                                  @bind-Value="model.LastName"
+                                  For="@(() => model.LastName)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="7">
+                    <MudTextField Label="E-pošta"
+                                  @bind-Value="model.Email"
+                                  For="@(() => model.Email)"
+                                  InputType="InputType.Email"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="5">
+                    <MudTextField Label="Telefon"
+                                  @bind-Value="model.Phone"
+                                  For="@(() => model.Phone)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Radno mjesto"
+                                  @bind-Value="model.JobTitle"
+                                  For="@(() => model.JobTitle)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int"
+                               Label="Lokacija"
+                               @bind-Value="model.LocationId"
+                               For="@(() => model.LocationId)"
+                               Variant="Variant.Outlined">
+                        @foreach (var location in locations)
+                        {
+                            <MudSelectItem T="int" Value="@location.Id">@location.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="model.IsActive" Color="Color.Primary">Aktivan</MudSwitch>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex gap-2 mt-6">
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           Disabled="isSaving">
+                    Spremi promjene
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="isSaving"
+                           OnClick="@(() => Navigation.NavigateTo("/employees"))">
+                    Odustani
+                </MudButton>
+            </div>
+        </EditForm>
+    </MudPaper>
+</LoadingArea>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private SaveEmployeeDto model = new();
+    private List<LookupDto> locations = new();
+
+    private string? subtitle;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var lookup = await Api.GetAsync<List<LookupDto>>("api/locations/lookup");
+        if (lookup.IsSuccess)
+            locations = lookup.Data ?? new List<LookupDto>();
+
+        var employee = await Api.GetAsync<EmployeeDto>($"api/employees/{Id}");
+
+        if (!employee.IsSuccess || employee.Data is null)
+        {
+            errorMessage = employee.ErrorMessage ?? "Zaposlenik nije pronađen.";
+            isLoading = false;
+            return;
+        }
+
+        var data = employee.Data;
+
+        subtitle = data.FullName;
+
+        // lokacija zaposlenika koja je u međuvremenu deaktivirana ne dolazi u lookupu
+        if (!locations.Any(loc => loc.Id == data.LocationId))
+            locations.Add(new LookupDto { Id = data.LocationId, Name = data.LocationName });
+
+        model = new SaveEmployeeDto
+        {
+            FirstName = data.FirstName,
+            LastName = data.LastName,
+            Email = data.Email,
+            Phone = data.Phone,
+            JobTitle = data.JobTitle,
+            LocationId = data.LocationId,
+            IsActive = data.IsActive
+        };
+
+        isLoading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        isSaving = true;
+
+        var result = await Api.PutAsync<object>($"api/employees/{Id}", model);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Promjene su spremljene.", Severity.Success);
+            Navigation.NavigateTo("/employees");
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Spremanje nije uspjelo.", Severity.Error);
+            isSaving = false;
+        }
+    }
+}

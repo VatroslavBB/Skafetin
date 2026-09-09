@@ -1,0 +1,178 @@
+﻿@page "/my-requests"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Moji zahtjevi</PageTitle>
+
+<PageHeader Title="Moji zahtjevi" Subtitle="Zahtjevi za novom ili zamjenskom opremom koje si poslao"
+            Icon="@Icons.Material.Filled.Outbox">
+    <Actions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateAsync">
+            Novi zahtjev
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+    <MudSelect T="int?"
+               @bind-Value="selectedStatusId"
+               @bind-Value:after="ReloadAsync"
+               Label="Status"
+               Clearable="true"
+               Variant="Variant.Outlined"
+               Style="max-width: 320px;">
+        @foreach (var status in statuses)
+        {
+            <MudSelectItem T="int?" Value="@status.Id">@status.Name</MudSelectItem>
+        }
+    </MudSelect>
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable T="EquipmentRequestDto"
+              Items="requests"
+              Hover="true"
+              Striped="true"
+              Elevation="0"
+              Dense="true">
+        <HeaderContent>
+            <MudTh>Poslano</MudTh>
+            <MudTh>Naslov</MudTh>
+            <MudTh>Kategorija</MudTh>
+            <MudTh>Zamjena za</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Dodijeljeno</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Poslano">@context.CreatedAt.ToString("dd.MM.yyyy.")</MudTd>
+            <MudTd DataLabel="Naslov">@context.Title</MudTd>
+            <MudTd DataLabel="Kategorija">@context.EquipmentCategoryName</MudTd>
+            <MudTd DataLabel="Zamjena za">@(context.ReplacementForEquipmentInventoryNumber ?? "-")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@StatusColors.Request(context.RequestStatusId)"
+                         Variant="Variant.Text">
+                    @context.RequestStatusName
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Dodijeljeno">@(context.ResultingEquipmentInventoryNumber ?? "-")</MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (!string.IsNullOrWhiteSpace(context.DecisionNote))
+            {
+                <MudTr>
+                    <MudTd colspan="6">
+                        <MudAlert Severity="@(context.RequestStatusId == RequestStatusRejected ? Severity.Error : Severity.Info)"
+                                  Dense="true"
+                                  Variant="Variant.Text">
+                            Obrazloženje: @context.DecisionNote
+                        </MudAlert>
+                    </MudTd>
+                </MudTr>
+            }
+        </ChildRowContent>
+        <NoRecordsContent>
+            <EmptyState Title="Još nisi poslao nijedan zahtjev"
+                        Description="Zahtjev za novom ili zamjenskom opremom šalješ gumbom gore desno." />
+        </NoRecordsContent>
+    </MudTable>
+</LoadingArea>
+
+@code {
+    private const int RequestStatusRejected = 4;
+
+    private List<EquipmentRequestDto> requests = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> categories = new();
+
+    private int? selectedStatusId;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        statuses = await LoadLookupAsync("api/requeststatuses");
+        categories = await LoadLookupAsync("api/equipmentcategories");
+        await ReloadAsync();
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task ReloadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var url = selectedStatusId.HasValue
+            ? $"api/equipmentrequests/mine?statusId={selectedStatusId.Value}"
+            : "api/equipmentrequests/mine";
+
+        var result = await Api.GetAsync<List<EquipmentRequestDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            requests = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat zahtjeva nije uspio.";
+
+        isLoading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        // Zamjenska oprema se nudi samo iz vlastitih zaduženja - zahtjev za zamjenom
+        // ima smisla samo za opremu koju zaposlenik trenutno drži.
+        var myEquipment = await LoadMyEquipmentAsync();
+
+        var parameters = new DialogParameters<CreateEquipmentRequestDialog>
+        {
+            { x => x.Categories, categories },
+            { x => x.MyEquipment, myEquipment }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateEquipmentRequestDialog>("Novi zahtjev", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not SaveEquipmentRequestDto dto)
+            return;
+
+        var result = await Api.PostAsync<EquipmentRequestDto>("api/equipmentrequests/mine", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zahtjev je poslan.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Slanje zahtjeva nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private async Task<List<LookupDto>> LoadMyEquipmentAsync()
+    {
+        var result = await Api.GetAsync<List<AssignmentDto>>("api/assignments/mine?activeOnly=true");
+
+        if (!result.IsSuccess || result.Data is null)
+            return new List<LookupDto>();
+
+        return result.Data
+            .Select(a => new LookupDto
+            {
+                Id = a.EquipmentId,
+                Name = a.InventoryNumber + " - " + a.EquipmentName
+            })
+            .ToList();
+    }
+
+}

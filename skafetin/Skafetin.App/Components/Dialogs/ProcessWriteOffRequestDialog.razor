@@ -1,0 +1,74 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Gavel" Class="mr-2" />
+            Odluka o zahtjevu
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Request.InventoryNumber - @Request.EquipmentName<br />
+            Podnio: @Request.RequestedByEmployeeFullName, @Request.CreatedAt.ToString("dd.MM.yyyy.")
+        </MudText>
+
+        <MudPaper Class="pa-3 mb-4" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">Obrazloženje zahtjeva</MudText>
+            <MudText Typo="Typo.body2">@Request.Reason</MudText>
+        </MudPaper>
+
+        <EditForm Model="model">
+            <DataAnnotationsValidator />
+
+            <MudRadioGroup T="int" @bind-Value="model.NewStatusId" Class="mb-3">
+                <MudRadio T="int" Value="@StatusApproved" Color="Color.Success">Odobri</MudRadio>
+                <MudRadio T="int" Value="@StatusRejected" Color="Color.Error">Odbij</MudRadio>
+            </MudRadioGroup>
+
+            <MudTextField T="string"
+                          Label="@(model.NewStatusId == StatusRejected ? "Obrazloženje odbijanja (obavezno)" : "Obrazloženje odluke")"
+                          @bind-Value="model.DecisionNote"
+                          For="@(() => model.DecisionNote)"
+                          Lines="3"
+                          Variant="Variant.Outlined" />
+        </EditForm>
+
+        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined" Class="mt-3">
+            Odobrenje ne otpisuje opremu. Otpis provodi administrator zasebnom radnjom.
+        </MudAlert>
+
+        @if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@validationMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Spremi odluku</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const int StatusApproved = 3;
+    private const int StatusRejected = 4;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public WriteOffRequestDto Request { get; set; } = default!;
+
+    private ProcessRequestDto model = new() { NewStatusId = StatusApproved };
+    private string? validationMessage;
+
+    private void Submit()
+    {
+        if (model.NewStatusId == StatusRejected && string.IsNullOrWhiteSpace(model.DecisionNote))
+        {
+            validationMessage = "Kod odbijanja zahtjeva obrazloženje je obavezno.";
+            return;
+        }
+
+        model.DecisionNote = string.IsNullOrWhiteSpace(model.DecisionNote) ? null : model.DecisionNote.Trim();
+        MudDialog.Close(DialogResult.Ok(model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

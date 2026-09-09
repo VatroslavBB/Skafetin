@@ -1,5 +1,68 @@
 ﻿<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
-        Home
-    </MudNavLink>
+    <AuthorizeView>
+        <NotAuthorized>
+            <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login">
+                Prijava
+            </MudNavLink>
+        </NotAuthorized>
+
+        <Authorized>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                Početna
+            </MudNavLink>
+
+            <AuthorizeView Roles="Admin,InventoryManager,LocationResponsible" Context="imovina">
+                <MudText Typo="Typo.overline" Class="nav-group-label">Imovina</MudText>
+
+                <MudNavLink Href="/equipment" Icon="@Icons.Material.Filled.Inventory2">
+                    Oprema
+                </MudNavLink>
+                <MudNavLink Href="/assignments" Icon="@Icons.Material.Filled.AssignmentTurnedIn">
+                    Zaduženja
+                </MudNavLink>
+                <MudNavLink Href="/inventories" Icon="@Icons.Material.Filled.FactCheck">
+                    Inventure
+                </MudNavLink>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="Admin,InventoryManager" Context="zahtjevi">
+                <MudText Typo="Typo.overline" Class="nav-group-label">Zahtjevi</MudText>
+
+                <MudNavLink Href="/equipment-requests" Icon="@Icons.Material.Filled.Mail">
+                    Zahtjevi za opremom
+                </MudNavLink>
+                <MudNavLink Href="/write-off-requests" Icon="@Icons.Material.Filled.DeleteSweep">
+                    Otpis
+                </MudNavLink>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="Admin,InventoryManager" Context="sifrarnici">
+                <MudText Typo="Typo.overline" Class="nav-group-label">Šifrarnici</MudText>
+
+                <MudNavLink Href="/locations" Icon="@Icons.Material.Filled.Place">
+                    Lokacije
+                </MudNavLink>
+                <MudNavLink Href="/employees" Icon="@Icons.Material.Filled.Badge">
+                    Zaposlenici
+                </MudNavLink>
+            </AuthorizeView>
+
+            <MudText Typo="Typo.overline" Class="nav-group-label">Moje</MudText>
+
+            <MudNavLink Href="/my-equipment" Icon="@Icons.Material.Filled.Laptop">
+                Moja oprema
+            </MudNavLink>
+            <MudNavLink Href="/my-requests" Icon="@Icons.Material.Filled.Outbox">
+                Moji zahtjevi
+            </MudNavLink>
+
+            <AuthorizeView Roles="Admin" Context="administracija">
+                <MudText Typo="Typo.overline" Class="nav-group-label">Administracija</MudText>
+
+                <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">
+                    Korisnici i uloge
+                </MudNavLink>
+            </AuthorizeView>
+        </Authorized>
+    </AuthorizeView>
 </MudNavMenu>

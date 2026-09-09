@@ -1,0 +1,106 @@
+@inject ApiClient Api
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Class="mr-2" />
+            Prijenos zaduženja
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            @Assignment.InventoryNumber - @Assignment.EquipmentName<br />
+            Trenutno zaduženo: @Assignment.EmployeeFullName, od @Assignment.AssignedAt.ToString("dd.MM.yyyy.")
+        </MudText>
+
+        <MudSelect T="int?"
+                   Label="Novi zaposlenik"
+                   @bind-Value="toEmployeeId"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (var employee in employees)
+            {
+                <MudSelectItem T="int?" Value="@employee.Id">@employee.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudDatePicker Label="Datum prijenosa"
+                       @bind-Date="transferredAt"
+                       MinDate="@Assignment.AssignedAt.Date"
+                       MaxDate="DateTime.Today"
+                       DateFormat="dd.MM.yyyy."
+                       Variant="Variant.Outlined"
+                       Class="mb-3" />
+
+        <MudTextField T="string"
+                      Label="Napomena"
+                      @bind-Value="note"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+
+        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined" Class="mt-3">
+            Postojeće zaduženje ostaje u povijesti sa statusom Premješteno, a otvara se novo aktivno.
+        </MudAlert>
+
+        @if (!string.IsNullOrWhiteSpace(validationMessage))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@validationMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">Prenesi</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public AssignmentDto Assignment { get; set; } = default!;
+
+    private List<LookupDto> employees = new();
+    private int? toEmployeeId;
+    private DateTime? transferredAt = DateTime.Today;
+    private string? note;
+    private string? validationMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<List<LookupDto>>("api/employees/lookup");
+
+        // Trenutni zaduženik se izbacuje iz popisa - prijenos na istu osobu Api odbija.
+        employees = (result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>())
+            .Where(e => e.Id != Assignment.EmployeeId)
+            .ToList();
+    }
+
+    private void Submit()
+    {
+        if (toEmployeeId is null)
+        {
+            validationMessage = "Odaberi zaposlenika na kojeg se oprema prenosi.";
+            return;
+        }
+
+        if (transferredAt is null)
+        {
+            validationMessage = "Datum prijenosa je obavezan.";
+            return;
+        }
+
+        if (transferredAt.Value.Date < Assignment.AssignedAt.Date)
+        {
+            validationMessage = "Datum prijenosa ne može biti prije datuma zaduženja.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new TransferAssignmentDto
+        {
+            ToEmployeeId = toEmployeeId.Value,
+            TransferredAt = transferredAt.Value,
+            Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        }));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

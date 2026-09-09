@@ -484,3 +484,8 @@ $RECYCLE.BIN/
 *.db
 *.db-shm
 *.db-wal
+
+# Ostaci datoteka obrisanih dok ih je proces jos drzao otvorenima (FUSE)
+.fuse_hidden*
+# Uploadane datoteke opreme (ne idu u repo)
+skafetin/Skafetin.Api/uploads/

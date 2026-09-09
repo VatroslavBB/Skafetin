@@ -1,0 +1,70 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FactCheck" Class="mr-2" />
+            Nova inventura
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+            Inventura se otvara nad jednom lokacijom. Stavke nastaju tek pokretanjem popisa.
+        </MudText>
+
+        <EditForm Model="model" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+
+            <MudTextField T="string"
+                          Label="Oznaka"
+                          @bind-Value="model.Code"
+                          For="@(() => model.Code)"
+                          Placeholder="INV-2026-004"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudSelect T="int"
+                       Label="Lokacija"
+                       @bind-Value="model.LocationId"
+                       For="@(() => model.LocationId)"
+                       Variant="Variant.Outlined"
+                       Class="mb-3">
+                @foreach (var location in Locations)
+                {
+                    <MudSelectItem T="int" Value="@location.Id">@location.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField T="string"
+                          Label="Napomena"
+                          @bind-Value="model.Note"
+                          For="@(() => model.Note)"
+                          Lines="3"
+                          Variant="Variant.Outlined" />
+
+            <div class="d-flex justify-end gap-2 mt-4">
+                <MudButton OnClick="Cancel">Odustani</MudButton>
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary">
+                    Stvori
+                </MudButton>
+            </div>
+        </EditForm>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public List<LookupDto> Locations { get; set; } = new();
+
+    private SaveInventoryDto model = new();
+
+    private void Submit()
+    {
+        model.Code = model.Code.Trim();
+        model.Note = string.IsNullOrWhiteSpace(model.Note) ? null : model.Note.Trim();
+        MudDialog.Close(DialogResult.Ok(model));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

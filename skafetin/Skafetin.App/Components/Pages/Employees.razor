@@ -1,0 +1,193 @@
+﻿@page "/employees"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Zaposlenici</PageTitle>
+
+<PageHeader Title="Zaposlenici" Subtitle="Popis zaposlenika kojima se zadužuje imovina"
+            Icon="@Icons.Material.Filled.Badge">
+    <Actions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => Navigation.NavigateTo("/employees/create"))">
+            Novi zaposlenik
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" md="5">
+            <MudTextField T="string"
+                          @bind-Value="search"
+                          Label="Pretraga"
+                          Placeholder="Ime, prezime ili e-pošta"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="LoadAsync"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       @bind-Value="selectedLocationId"
+                       @bind-Value:after="LoadAsync"
+                       Label="Lokacija"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var location in locations)
+                {
+                    <MudSelectItem T="int?" Value="@location.Id">@location.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="bool?"
+                       @bind-Value="selectedIsActive"
+                       @bind-Value:after="LoadAsync"
+                       Label="Status"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="bool?" Value="@true">Aktivni</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@false">Neaktivni</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FilterAltOff"
+                       OnClick="ClearFiltersAsync"
+                       FullWidth="true">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable Items="employees" Hover="true" Striped="true" Elevation="0">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="new Func<EmployeeDto, object>(e => e.LastName)">Ime i prezime</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<EmployeeDto, object>(e => e.Email)">E-pošta</MudTableSortLabel></MudTh>
+            <MudTh>Telefon</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<EmployeeDto, object>(e => e.JobTitle ?? string.Empty)">Radno mjesto</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<EmployeeDto, object>(e => e.LocationName)">Lokacija</MudTableSortLabel></MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 120px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Ime i prezime">@context.FullName</MudTd>
+            <MudTd DataLabel="E-pošta">@context.Email</MudTd>
+            <MudTd DataLabel="Telefon">@(string.IsNullOrWhiteSpace(context.Phone) ? "-" : context.Phone)</MudTd>
+            <MudTd DataLabel="Radno mjesto">@(string.IsNullOrWhiteSpace(context.JobTitle) ? "-" : context.JobTitle)</MudTd>
+            <MudTd DataLabel="Lokacija">@context.LocationName</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">Aktivan</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">Neaktivan</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               OnClick="@(() => Navigation.NavigateTo($"/employees/edit/{context.Id}"))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@(() => DeleteAsync(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Title="Nema zaposlenika za ove filtre"
+                        Description="Provjeri pretragu i odabrani status, ili očisti filtre." />
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Redaka po stranici:" />
+        </PagerContent>
+    </MudTable>
+</LoadingArea>
+
+@code {
+    private List<EmployeeDto> employees = new();
+    private List<LookupDto> locations = new();
+
+    private string? search;
+    private int? selectedLocationId;
+    private bool? selectedIsActive;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var lookup = await Api.GetAsync<List<LookupDto>>("api/locations/lookup");
+        if (lookup.IsSuccess && lookup.Data is not null)
+            locations = lookup.Data;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (selectedLocationId.HasValue)
+            parameters.Add($"locationId={selectedLocationId.Value}");
+
+        if (selectedIsActive.HasValue)
+            parameters.Add($"isActive={selectedIsActive.Value.ToString().ToLowerInvariant()}");
+
+        var url = "api/employees";
+        if (parameters.Count > 0)
+            url += "?" + string.Join("&", parameters);
+
+        var result = await Api.GetAsync<List<EmployeeDto>>(url);
+
+        if (result.IsSuccess)
+            employees = result.Data ?? new List<EmployeeDto>();
+        else
+            errorMessage = result.ErrorMessage;
+
+        isLoading = false;
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedLocationId = null;
+        selectedIsActive = null;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(EmployeeDto employee)
+    {
+        if (!await DialogService.ConfirmDeleteAsync($"Zaposlenik \"{employee.FullName}\""))
+            return;
+
+        var result = await Api.DeleteAsync($"api/employees/{employee.Id}");
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zaposlenik je obrisan.", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Brisanje nije uspjelo.", Severity.Error);
+        }
+    }
+}

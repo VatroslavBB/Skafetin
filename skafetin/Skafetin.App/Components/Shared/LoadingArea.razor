@@ -1,0 +1,31 @@
+﻿
+@if (IsLoading)
+{
+    <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+        <MudSkeleton Animation="Animation.Wave" Height="34px" Width="42%" Class="mb-4" />
+
+        @for (var i = 0; i < Rows; i++)
+        {
+            <MudSkeleton Animation="Animation.Wave" Height="22px" Class="mb-2" />
+        }
+    </MudPaper>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">
+        @ErrorMessage
+    </MudAlert>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// Broj redaka kostura. Manje za forme, više za duge popise.
+    [Parameter] public int Rows { get; set; } = 5;
+}

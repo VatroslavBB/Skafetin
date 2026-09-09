@@ -1,0 +1,136 @@
+﻿@page "/locations/edit/{Id:int}"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Uređivanje lokacije</PageTitle>
+
+<PageHeader Title="Uređivanje lokacije" Subtitle="@subtitle"
+            Icon="@Icons.Material.Filled.Place" />
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="errorMessage">
+    <MudPaper Class="pa-6" Elevation="0" Style="max-width: 720px;">
+        <EditForm Model="model" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudTextField Label="Naziv"
+                                  @bind-Value="model.Name"
+                                  For="@(() => model.Name)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="Adresa"
+                                  @bind-Value="model.Address"
+                                  For="@(() => model.Address)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int"
+                                     Label="Poštanski broj"
+                                     @bind-Value="model.Zip"
+                                     For="@(() => model.Zip)"
+                                     HideSpinButtons="true"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="8">
+                    <MudTextField Label="Grad"
+                                  @bind-Value="model.City"
+                                  For="@(() => model.City)"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int"
+                               Label="Vrsta lokacije"
+                               @bind-Value="model.LocationTypeId"
+                               For="@(() => model.LocationTypeId)"
+                               Variant="Variant.Outlined">
+                        @foreach (var type in locationTypes)
+                        {
+                            <MudSelectItem T="int" Value="@type.Id">@type.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="model.IsActive" Color="Color.Primary">Aktivna</MudSwitch>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex gap-2 mt-6">
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           Disabled="isSaving">
+                    Spremi promjene
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="isSaving"
+                           OnClick="@(() => Navigation.NavigateTo("/locations"))">
+                    Odustani
+                </MudButton>
+            </div>
+        </EditForm>
+    </MudPaper>
+</LoadingArea>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private SaveLocationDto model = new();
+    private List<LookupDto> locationTypes = new();
+
+    private string? subtitle;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var types = await Api.GetAsync<List<LookupDto>>("api/locationtypes");
+        if (types.IsSuccess)
+            locationTypes = types.Data ?? new List<LookupDto>();
+
+        var location = await Api.GetAsync<LocationDto>($"api/locations/{Id}");
+
+        if (!location.IsSuccess || location.Data is null)
+        {
+            errorMessage = location.ErrorMessage ?? "Lokacija nije pronađena.";
+            isLoading = false;
+            return;
+        }
+
+        subtitle = location.Data.Name;
+
+        model = new SaveLocationDto
+        {
+            Name = location.Data.Name,
+            Address = location.Data.Address,
+            Zip = location.Data.Zip,
+            City = location.Data.City,
+            LocationTypeId = location.Data.LocationTypeId,
+            IsActive = location.Data.IsActive
+        };
+
+        isLoading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        isSaving = true;
+
+        var result = await Api.PutAsync<object>($"api/locations/{Id}", model);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Promjene su spremljene.", Severity.Success);
+            Navigation.NavigateTo("/locations");
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Spremanje nije uspjelo.", Severity.Error);
+            isSaving = false;
+        }
+    }
+}

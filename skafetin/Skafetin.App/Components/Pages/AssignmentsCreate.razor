@@ -1,0 +1,172 @@
+﻿@page "/assignments/create"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Novo zaduženje</PageTitle>
+
+<PageHeader Title="Novo zaduženje" Subtitle="Zaduživanje opreme zaposleniku"
+            Icon="@Icons.Material.Filled.AssignmentTurnedIn" />
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudPaper Class="pa-6" Elevation="0" Style="max-width: 720px;">
+        <EditForm Model="model" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudSelect T="int"
+                               Label="Oprema"
+                               @bind-Value="model.EquipmentId"
+                               For="@(() => model.EquipmentId)"
+                               Adornment="Adornment.End"
+                               AdornmentIcon="@Icons.Material.Filled.QrCodeScanner"
+                               AdornmentAriaLabel="Skeniraj QR kod opreme"
+                               OnAdornmentClick="ScanAsync"
+                               Variant="Variant.Outlined">
+                        @foreach (var item in equipment)
+                        {
+                            <MudSelectItem T="int" Value="@item.Id">@item.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int"
+                               Label="Zaposlenik"
+                               @bind-Value="model.EmployeeId"
+                               For="@(() => model.EmployeeId)"
+                               Variant="Variant.Outlined">
+                        @foreach (var employee in employees)
+                        {
+                            <MudSelectItem T="int" Value="@employee.Id">@employee.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Datum zaduženja"
+                                   @bind-Date="assignedAt"
+                                   MaxDate="DateTime.Today"
+                                   DateFormat="dd.MM.yyyy."
+                                   Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="Napomena"
+                                  @bind-Value="model.Note"
+                                  For="@(() => model.Note)"
+                                  Lines="3"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+
+            @if (!string.IsNullOrWhiteSpace(dateMessage))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-4">@dateMessage</MudAlert>
+            }
+
+            <div class="d-flex gap-2 mt-6">
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           Disabled="isSaving">
+                    Zaduži
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="@(() => Navigation.NavigateTo("/assignments"))">
+                    Odustani
+                </MudButton>
+            </div>
+        </EditForm>
+    </MudPaper>
+</LoadingArea>
+
+@code {
+    private SaveAssignmentDto model = new();
+
+    private List<LookupDto> equipment = new();
+    private List<LookupDto> employees = new();
+
+    private DateTime? assignedAt = DateTime.Today;
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private string? dateMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        equipment = await LoadLookupAsync("api/equipment/lookup?availableOnly=true");
+        employees = await LoadLookupAsync("api/employees/lookup");
+        isLoading = false;
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+
+        if (!result.IsSuccess)
+            errorMessage = result.ErrorMessage;
+
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task ScanAsync()
+    {
+        var dialog = await DialogService.ShowAsync<QrScannerDialog>("Skeniranje opreme");
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not int equipmentId)
+            return;
+
+        var match = equipment.FirstOrDefault(x => x.Id == equipmentId);
+
+        if (match is not null)
+        {
+            model.EquipmentId = match.Id;
+            Snackbar.Add($"Odabrana oprema: {match.Name}.", Severity.Success);
+            return;
+        }
+
+        var result = await Api.GetAsync<EquipmentDetailsDto>($"api/equipment/{equipmentId}");
+
+        Snackbar.Add(
+            result.IsSuccess && result.Data is not null
+                ? $"Oprema \"{result.Data.Name}\" ({result.Data.InventoryNumber}) nije dostupna za zaduživanje."
+                : "Skenirana oprema ne postoji.",
+            Severity.Warning);
+    }
+
+    private async Task SubmitAsync()
+    {
+        dateMessage = null;
+
+        if (assignedAt is null)
+        {
+            dateMessage = "Datum zaduženja je obavezan.";
+            return;
+        }
+
+        if (assignedAt.Value.Date > DateTime.Today)
+        {
+            dateMessage = "Datum zaduženja ne može biti u budućnosti.";
+            return;
+        }
+
+        model.AssignedAt = assignedAt.Value;
+
+        isSaving = true;
+        var result = await Api.PostAsync<AssignmentDto>("api/assignments", model);
+        isSaving = false;
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Oprema je zadužena.", Severity.Success);
+            Navigation.NavigateTo("/assignments");
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Zaduživanje nije uspjelo.", Severity.Error);
+        }
+    }
+}

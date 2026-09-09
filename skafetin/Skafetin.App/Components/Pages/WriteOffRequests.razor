@@ -1,0 +1,347 @@
+﻿@page "/write-off-requests"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject CurrentUserService CurrentUser
+
+<PageTitle>Otpis</PageTitle>
+
+<PageHeader Title="Otpis opreme" Subtitle="Zahtjevi za otpisom neupotrebljive opreme i njihova obrada"
+            Icon="@Icons.Material.Filled.DeleteSweep">
+    <Actions>
+        @if (canRequest)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="CreateAsync">
+                Novi zahtjev
+            </MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+@if (!canManage)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
+        Popis zahtjeva za otpisom vide samo administrator i voditelj imovine. Ti možeš podnijeti zahtjev, a o njemu odlučuju oni.
+    </MudAlert>
+}
+
+@if (canManage)
+{
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+    <MudGrid Spacing="2" Class="align-center">
+        <MudItem xs="12" md="5">
+            <MudTextField T="string"
+                          @bind-Value="search"
+                          Label="Pretraga"
+                          Placeholder="Oprema, inventurni broj, obrazloženje ili podnositelj"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          OnDebounceIntervalElapsed="ReloadAsync"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       @bind-Value="selectedStatusId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Status"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@status.Id">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       @bind-Value="selectedLocationId"
+                       @bind-Value:after="ReloadAsync"
+                       Label="Lokacija"
+                       Clearable="true"
+                       Variant="Variant.Outlined">
+                @foreach (var location in locations)
+                {
+                    <MudSelectItem T="int?" Value="@location.Id">@location.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="1">
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.FilterAltOff"
+                       OnClick="ClearFiltersAsync"
+                       FullWidth="true">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable T="WriteOffRequestDto"
+              Items="requests"
+              Hover="true"
+              Striped="true"
+              Elevation="0"
+              Dense="true">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel T="WriteOffRequestDto" SortBy="@(w => w.InventoryNumber)">Inventurni broj</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="WriteOffRequestDto" SortBy="@(w => w.EquipmentName)">Oprema</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="WriteOffRequestDto" SortBy="@(w => w.LocationName ?? string.Empty)">Lokacija</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="WriteOffRequestDto" SortBy="@(w => w.RequestedByEmployeeFullName)">Podnositelj</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="WriteOffRequestDto" SortBy="@(w => w.CreatedAt)" InitialDirection="SortDirection.Descending">Podneseno</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="WriteOffRequestDto" SortBy="@(w => w.WriteOffRequestStatusName)">Status</MudTableSortLabel></MudTh>
+            <MudTh>Proveden</MudTh>
+            <MudTh Style="width: 140px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Inventurni broj">@context.InventoryNumber</MudTd>
+            <MudTd DataLabel="Oprema">@context.EquipmentName</MudTd>
+            <MudTd DataLabel="Lokacija">@(context.LocationName ?? "-")</MudTd>
+            <MudTd DataLabel="Podnositelj">@context.RequestedByEmployeeFullName</MudTd>
+            <MudTd DataLabel="Podneseno">@context.CreatedAt.ToString("dd.MM.yyyy.")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@StatusColors.WriteOff(context.WriteOffRequestStatusId)"
+                         Variant="Variant.Text">
+                    @context.WriteOffRequestStatusName
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Proveden">
+                @(context.ExecutedAt.HasValue ? context.ExecutedAt.Value.ToString("dd.MM.yyyy.") : "-")
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                               Size="Size.Small"
+                               Title="Profil opreme"
+                               OnClick="@(() => Navigation.NavigateTo($"/equipment/{context.EquipmentId}"))" />
+
+                @if (canManage && context.WriteOffRequestStatusId == StatusReceived)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                   Size="Size.Small"
+                                   Color="Color.Info"
+                                   Title="Preuzmi u obradu"
+                                   OnClick="@(() => TakeInProgressAsync(context))" />
+                }
+
+                @if (canManage && context.WriteOffRequestStatusId == StatusInProgress)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Gavel"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   Title="Odluči"
+                                   OnClick="@(() => ProcessAsync(context))" />
+                }
+
+                @if (isAdmin && context.WriteOffRequestStatusId == StatusApproved)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   Title="Provedi otpis"
+                                   OnClick="@(() => ExecuteAsync(context))" />
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Title="Nema zahtjeva za otpisom za ove filtre"
+                        Description="Promijeni status ili lokaciju, ili očisti filtre." />
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager RowsPerPageString="Redaka po stranici:"
+                           PageSizeOptions="new[] { 10, 20, 50 }"
+                           InfoFormat="{first_item}-{last_item} od {all_items}" />
+        </PagerContent>
+    </MudTable>
+</LoadingArea>
+}
+
+@code {
+    private const int StatusReceived = 1;
+    private const int StatusInProgress = 2;
+    private const int StatusApproved = 3;
+    private const int StatusRejected = 4;
+    private const int StatusExecuted = 5;
+
+    private List<WriteOffRequestDto> requests = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> locations = new();
+    private List<LookupDto> equipment = new();
+
+    private string? search;
+    private int? selectedStatusId;
+    private int? selectedLocationId;
+
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private bool canManage => CurrentUser.HasAnyRole("Admin", "InventoryManager");
+    private bool canRequest => CurrentUser.HasAnyRole("Admin", "InventoryManager", "LocationResponsible");
+    private bool isAdmin => CurrentUser.HasRole("Admin");
+
+    protected override async Task OnInitializedAsync()
+    {
+        statuses = await LoadLookupAsync("api/writeoffrequeststatuses");
+        locations = await LoadLookupAsync("api/locations/lookup");
+        equipment = await LoadLookupAsync("api/equipment/lookup");
+        await ReloadAsync();
+    }
+
+    private async Task<List<LookupDto>> LoadLookupAsync(string url)
+    {
+        var result = await Api.GetAsync<List<LookupDto>>(url);
+        return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task ReloadAsync()
+    {
+        // Popis je pod politikom Manage; voditelj lokacije smije samo podnijeti zahtjev.
+        if (!canManage)
+        {
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+
+        if (selectedStatusId.HasValue)
+            parameters.Add($"statusId={selectedStatusId.Value}");
+
+        if (selectedLocationId.HasValue)
+            parameters.Add($"locationId={selectedLocationId.Value}");
+
+        var url = "api/writeoffrequests" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : string.Empty);
+
+        var result = await Api.GetAsync<List<WriteOffRequestDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            requests = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat zahtjeva za otpisom nije uspio.";
+
+        isLoading = false;
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        search = null;
+        selectedStatusId = null;
+        selectedLocationId = null;
+        await ReloadAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        var parameters = new DialogParameters<CreateWriteOffRequestDialog>
+        {
+            { x => x.Equipment, equipment }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateWriteOffRequestDialog>("Novi zahtjev za otpisom", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not SaveWriteOffRequestDto dto)
+            return;
+
+        var result = await Api.PostAsync<WriteOffRequestDto>("api/writeoffrequests", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Zahtjev za otpisom je zaprimljen.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Slanje zahtjeva nije uspjelo.", Severity.Error);
+        }
+    }
+
+    private async Task TakeInProgressAsync(WriteOffRequestDto request)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            title: "Preuzimanje u obradu",
+            message: $"Zahtjev za {request.InventoryNumber} prelazi u status U obradi.",
+            yesText: "Preuzmi",
+            cancelText: "Odustani");
+
+        if (confirmed != true)
+            return;
+
+        var dto = new ProcessRequestDto { NewStatusId = StatusInProgress };
+        await SendProcessAsync(request, dto, "Zahtjev je preuzet u obradu.");
+    }
+
+    private async Task ProcessAsync(WriteOffRequestDto request)
+    {
+        var parameters = new DialogParameters<ProcessWriteOffRequestDialog>
+        {
+            { x => x.Request, request }
+        };
+
+        var dialog = await DialogService.ShowAsync<ProcessWriteOffRequestDialog>("Odluka o zahtjevu", parameters);
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not ProcessRequestDto dto)
+            return;
+
+        var message = dto.NewStatusId == StatusApproved
+            ? "Zahtjev je odobren."
+            : "Zahtjev je odbijen.";
+
+        await SendProcessAsync(request, dto, message);
+    }
+
+    private async Task SendProcessAsync(WriteOffRequestDto request, ProcessRequestDto dto, string successMessage)
+    {
+        var result = await Api.PostAsync<WriteOffRequestDto>($"api/writeoffrequests/{request.Id}/process", dto);
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add(successMessage, Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Obrada zahtjeva nije uspjela.", Severity.Error);
+        }
+    }
+
+    private async Task ExecuteAsync(WriteOffRequestDto request)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            title: "Provedba otpisa",
+            message: $"Oprema {request.InventoryNumber} - {request.EquipmentName} dobiva status Otpisano. Iz tog statusa nema povratka i oprema se više ne može zadužiti.",
+            yesText: "Provedi otpis",
+            cancelText: "Odustani");
+
+        if (confirmed != true)
+            return;
+
+        var result = await Api.PostAsync<WriteOffRequestDto>($"api/writeoffrequests/{request.Id}/execute", new { });
+
+        if (result.IsSuccess)
+        {
+            Snackbar.Add("Otpis je proveden.", Severity.Success);
+            await ReloadAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Provedba otpisa nije uspjela.", Severity.Error);
+        }
+    }
+
+}

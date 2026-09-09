@@ -1,5 +1,8 @@
+﻿using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using MudBlazor.Services;
 using Skafetin.App.Components;
+using Skafetin.App.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +16,14 @@ builder.Services.AddScoped(sp => new HttpClient
 {
     BaseAddress = new Uri(apiBaseUrl)
 });
+
+builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped<ProtectedLocalStorage>();
+builder.Services.AddScoped<CurrentUserService>();
+
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, SkafetinAuthenticationStateProvider>();
 
 var app = builder.Build();
 

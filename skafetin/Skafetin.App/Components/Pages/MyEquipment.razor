@@ -1,0 +1,97 @@
+﻿@page "/my-equipment"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Moja oprema</PageTitle>
+
+<PageHeader Title="Moja oprema" Subtitle="Oprema zadužena na tvoje ime"
+            Icon="@Icons.Material.Filled.Laptop" />
+
+<MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+    <MudSwitch T="bool"
+               @bind-Value="activeOnly"
+               @bind-Value:after="ReloadAsync"
+               Color="Color.Primary"
+               Label="Samo trenutno zaduženo" />
+</MudPaper>
+
+<LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudTable T="AssignmentDto"
+              Items="assignments"
+              Hover="true"
+              Striped="true"
+              Elevation="0"
+              Dense="true">
+        <HeaderContent>
+            <MudTh>Inventurni broj</MudTh>
+            <MudTh>Oprema</MudTh>
+            <MudTh>Zaduženo</MudTh>
+            <MudTh>Zatvoreno</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 60px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Inventurni broj">@context.InventoryNumber</MudTd>
+            <MudTd DataLabel="Oprema">@context.EquipmentName</MudTd>
+            <MudTd DataLabel="Zaduženo">@context.AssignedAt.ToString("dd.MM.yyyy.")</MudTd>
+            <MudTd DataLabel="Zatvoreno">
+                @(context.ReturnedAt.HasValue ? context.ReturnedAt.Value.ToString("dd.MM.yyyy.") : "-")
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="@StatusColors.Assignment(context.AssignmentStatusName)"
+                         Variant="Variant.Text">
+                    @context.AssignmentStatusName
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                               Size="Size.Small"
+                               Title="Profil opreme"
+                               OnClick="@(() => Navigation.NavigateTo($"/equipment/{context.EquipmentId}"))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            @if (activeOnly)
+            {
+                <EmptyState Title="Trenutno nemaš zaduženu opremu"
+                            Description="Isključi prekidač iznad da vidiš i zaduženja koja su vraćena ili premještena." />
+            }
+            else
+            {
+                <EmptyState Title="Nemaš nijedno zaduženje"
+                            Description="Kad ti se zaduži oprema, pojavit će se ovdje." />
+            }
+        </NoRecordsContent>
+    </MudTable>
+</LoadingArea>
+
+@code {
+    private List<AssignmentDto> assignments = new();
+
+    private bool activeOnly = true;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var url = activeOnly ? "api/assignments/mine?activeOnly=true" : "api/assignments/mine";
+
+        var result = await Api.GetAsync<List<AssignmentDto>>(url);
+
+        if (result.IsSuccess && result.Data is not null)
+            assignments = result.Data;
+        else
+            errorMessage = result.ErrorMessage ?? "Dohvat zaduženja nije uspio.";
+
+        isLoading = false;
+    }
+
+}

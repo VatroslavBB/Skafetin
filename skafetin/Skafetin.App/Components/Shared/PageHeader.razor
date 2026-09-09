@@ -1,0 +1,37 @@
+﻿
+
+@if (Breadcrumbs is not null && Breadcrumbs.Count > 0)
+{
+    <MudBreadcrumbs Items="Breadcrumbs" Class="pa-0 mb-2" />
+}
+
+<div class="d-flex align-center justify-space-between mb-5">
+    <div class="d-flex align-center">
+        @if (!string.IsNullOrWhiteSpace(Icon))
+        {
+            <div class="skf-page-icon mr-3">
+                <MudIcon Icon="@Icon" Size="Size.Medium" />
+            </div>
+        }
+        <div>
+            <MudText Typo="Typo.h4">@Title</MudText>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@Subtitle</MudText>
+            }
+        </div>
+    </div>
+
+    @if (Actions is not null)
+    {
+        <div class="d-flex gap-2">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public List<BreadcrumbItem>? Breadcrumbs { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}
