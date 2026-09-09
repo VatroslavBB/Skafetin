@@ -1,7 +1,30 @@
 @Skafetin.Api_HostAddress = https://localhost:7126
 
-### Prijava - token iz odgovora koriste zahtjevi ispod.
-# @name login
+###############################################################################
+# Autorizacijski testovi
+#
+# Pokreni redom, odozgo prema dolje - zahtjevi ispod koriste tokene iz prijava.
+# Stvarni status upiši u tablicu; ona je dokaz da je zaštita provedena na API-ju.
+#
+# | # | Zahtjev                                   | Korisnik         | Očekivano | Stvarno |
+# |---|-------------------------------------------|------------------|-----------|---------|
+# | 1 | POST /api/auth/login                      | admin            | 200       |         |
+# | 2 | POST /api/auth/login (kriva lozinka)      | admin            | 401       |         |
+# | 3 | GET  /api/equipment (bez tokena)          | -                | 401       |         |
+# | 4 | GET  /api/equipment                       | josip.matic      | 200       |         |
+# | 5 | POST /api/equipment                       | josip.matic      | 403       |         |
+# | 6 | GET  /api/users                           | marko.juric      | 403       |         |
+# | 7 | DELETE /api/locations/1                   | petra.kovacevic  | 403       |         |
+# | 8 | GET  /api/inventories/1 (tuđa lokacija)   | ana.peric        | 403       |         |
+# | 9 | GET  /api/inventories/2 (svoja lokacija)  | ana.peric        | 200       |         |
+# |10 | GET  /api/assignments/mine                | josip.matic      | 200       |         |
+# |11 | GET  /api/equipment/999999                | admin            | 404       |         |
+# |12 | POST /api/equipment (duplirani inv. broj) | admin            | 400       |         |
+# |13 | POST /api/equipment (ispravan unos)       | admin            | 201       |         |
+###############################################################################
+
+### 1. Prijava administratora - očekuje se 200
+# @name loginAdmin
 POST {{Skafetin.Api_HostAddress}}/api/auth/login
 Content-Type: application/json
 
@@ -10,17 +33,208 @@ Content-Type: application/json
   "password": "Skafetin1!"
 }
 
-@token = {{login.response.body.$.accessToken}}
+@adminToken = {{loginAdmin.response.body.$.accessToken}}
 
-### QR kod postojece opreme - ocekuje se 200 i PNG.
+### 2. Prijava s krivom lozinkom - očekuje se 401
+POST {{Skafetin.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "pogresna"
+}
+
+### Prijava zaposlenika (Employee)
+# @name loginEmployee
+POST {{Skafetin.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "josip.matic",
+  "password": "Skafetin1!"
+}
+
+@employeeToken = {{loginEmployee.response.body.$.accessToken}}
+
+### Prijava upravitelja imovine (InventoryManager)
+# @name loginManager
+POST {{Skafetin.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "petra.kovacevic",
+  "password": "Skafetin1!"
+}
+
+@managerToken = {{loginManager.response.body.$.accessToken}}
+
+### Prijava odgovorne osobe lokacije (LocationResponsible, OŠ Kamen-Šine)
+# @name loginResponsible
+POST {{Skafetin.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "ana.peric",
+  "password": "Skafetin1!"
+}
+
+@responsibleToken = {{loginResponsible.response.body.$.accessToken}}
+
+### Prijava voditelja imovine (InventoryManager + LocationResponsible)
+# @name loginMulti
+POST {{Skafetin.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "marko.juric",
+  "password": "Skafetin1!"
+}
+
+@multiToken = {{loginMulti.response.body.$.accessToken}}
+
+### 3. Popis opreme bez tokena - očekuje se 401 (FallbackPolicy)
+GET {{Skafetin.Api_HostAddress}}/api/equipment
+
+### 4. Popis opreme kao zaposlenik - očekuje se 200 (ruta nema dodatnu politiku)
+GET {{Skafetin.Api_HostAddress}}/api/equipment
+Authorization: Bearer {{employeeToken}}
+
+### 5. Unos opreme kao zaposlenik - očekuje se 403 (politika Manage)
+POST {{Skafetin.Api_HostAddress}}/api/equipment
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "name": "Pokusaj bez ovlasti",
+  "inventoryNumber": "TEST-0403",
+  "equipmentCategoryId": 1,
+  "equipmentStatusId": 1,
+  "locationId": 1
+}
+
+### 6. Administracija računa kao voditelj imovine - očekuje se 403 (politika AdminOnly)
+GET {{Skafetin.Api_HostAddress}}/api/users
+Authorization: Bearer {{multiToken}}
+
+### 7. Brisanje lokacije kao upravitelj imovine - očekuje se 403 (politika AdminOnly)
+DELETE {{Skafetin.Api_HostAddress}}/api/locations/1
+Authorization: Bearer {{managerToken}}
+
+### 8. Inventura tuđe lokacije (SŠ Braće Radić) kao odgovorna osoba - očekuje se 403 (pravilo 10)
+GET {{Skafetin.Api_HostAddress}}/api/inventories/1
+Authorization: Bearer {{responsibleToken}}
+
+### 9. Inventura vlastite lokacije (OŠ Kamen-Šine) kao odgovorna osoba - očekuje se 200
+GET {{Skafetin.Api_HostAddress}}/api/inventories/2
+Authorization: Bearer {{responsibleToken}}
+
+### 10. Vlastita zaduženja zaposlenika - očekuje se 200, id iz tokena a ne iz zahtjeva
+GET {{Skafetin.Api_HostAddress}}/api/assignments/mine
+Authorization: Bearer {{employeeToken}}
+
+### 11. Nepostojeća oprema - očekuje se 404
+GET {{Skafetin.Api_HostAddress}}/api/equipment/999999
+Authorization: Bearer {{adminToken}}
+
+### 12. Unos s postojećim inventurnim brojem - očekuje se 400 (pravilo 1)
+POST {{Skafetin.Api_HostAddress}}/api/equipment
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Duplikat inventurnog broja",
+  "inventoryNumber": "INV-0001",
+  "equipmentCategoryId": 1,
+  "equipmentStatusId": 1,
+  "locationId": 1
+}
+
+### 13. Ispravan unos opreme - očekuje se 201 i zaglavlje Location
+# Ponovni poziv daje 400 jer inventurni broj postaje zauzet; promijeni broj ili obriši zapis.
+POST {{Skafetin.Api_HostAddress}}/api/equipment
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Testna oprema iz .http datoteke",
+  "inventoryNumber": "TEST-0001",
+  "equipmentCategoryId": 1,
+  "equipmentStatusId": 1,
+  "locationId": 1,
+  "purchaseValue": 199.99
+}
+
+###############################################################################
+# QR kod (bonus B3)
+###############################################################################
+
+### PNG s QR kodom postojeće opreme - očekuje se 200 i image/png
 GET {{Skafetin.Api_HostAddress}}/api/equipment/1/qr
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
-### QR kod nepostojece opreme - ocekuje se 404.
+### QR kod nepostojeće opreme - očekuje se 404
 GET {{Skafetin.Api_HostAddress}}/api/equipment/999999/qr
-Authorization: Bearer {{token}}
+Authorization: Bearer {{adminToken}}
 
-### Bez tokena - ocekuje se 401.
-GET {{Skafetin.Api_HostAddress}}/api/equipment/1/qr
+###############################################################################
+# AI prijedlozi (bonus B4)
+###############################################################################
+
+### Aktivni AI provider - očekuje se 200 i Provider "Mock" u zadanoj konfiguraciji
+GET {{Skafetin.Api_HostAddress}}/api/ai/status
+Authorization: Bearer {{employeeToken}}
+
+### Sažetak inventure kao zaposlenik - očekuje se 403 (politika Manage)
+POST {{Skafetin.Api_HostAddress}}/api/ai/inventory-summary/2
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{}
+
+### Sažetak inventure u tijeku kao administrator - očekuje se 200
+POST {{Skafetin.Api_HostAddress}}/api/ai/inventory-summary/2
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{}
+
+### Sažetak nepostojeće inventure - očekuje se 404
+POST {{Skafetin.Api_HostAddress}}/api/ai/inventory-summary/999999
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{}
+
+### Prijedlog obrazloženja zahtjeva - očekuje se 200
+POST {{Skafetin.Api_HostAddress}}/api/ai/request-draft
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "equipmentCategoryId": 1,
+  "title": "Zamjenski monitor za radno mjesto"
+}
+
+### Prijedlog unosa opreme iz bilješke - očekuje se 200 i popunjena polja
+POST {{Skafetin.Api_HostAddress}}/api/ai/equipment-intake
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "text": "Dell Latitude 5540, s/n ABC12345, inv 2026-114, nabavna vrijednost 1150 EUR"
+}
+
+### Provjera podataka prije spremanja - očekuje se 200 i popis upozorenja
+POST {{Skafetin.Api_HostAddress}}/api/ai/equipment-check
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "",
+  "inventoryNumber": "INV-0001",
+  "equipmentCategoryId": 0,
+  "equipmentStatusId": 1,
+  "locationId": 1
+}
 
 ###
