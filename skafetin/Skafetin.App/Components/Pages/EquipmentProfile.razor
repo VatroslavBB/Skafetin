@@ -32,6 +32,11 @@
                     Premjesti
                 </MudButton>
             }
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.QrCode2"
+                       OnClick="ShowQrCodeAsync">
+                QR kod
+            </MudButton>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Edit"
@@ -421,6 +426,21 @@
             await LoadAssignmentsAsync();
             await LoadMediaAsync();
         }
+    }
+
+    private async Task ShowQrCodeAsync()
+    {
+        if (equipment is null)
+            return;
+
+        var parameters = new DialogParameters<EquipmentQrDialog>
+        {
+            { x => x.EquipmentId, equipment.Id },
+            { x => x.InventoryNumber, equipment.InventoryNumber },
+            { x => x.EquipmentName, equipment.Name }
+        };
+
+        await DialogService.ShowAsync<EquipmentQrDialog>("QR kod opreme", parameters);
     }
 
     private async Task MoveAsync()

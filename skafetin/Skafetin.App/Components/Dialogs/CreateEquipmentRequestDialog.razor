@@ -1,3 +1,5 @@
+@inject ApiClient Api
+
 <MudDialog>
     <TitleContent>
         <MudText Typo="Typo.h6">
@@ -36,7 +38,43 @@
                           Lines="4"
                           MaxLength="1000"
                           Variant="Variant.Outlined"
-                          Class="mb-3" />
+                          Class="mb-1" />
+
+            <div class="d-flex justify-end mb-3">
+                <MudButton Size="Size.Small"
+                           Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.AutoAwesome"
+                           Disabled="isSuggesting"
+                           OnClick="SuggestAsync">
+                    Predloži obrazloženje
+                </MudButton>
+            </div>
+
+            @if (suggestion is not null)
+            {
+                <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        Prijedlog - pregledaj prije nego ga upotrijebiš.
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">@suggestion.Text</MudText>
+                    <div class="d-flex justify-end gap-2 mt-3">
+                        <MudButton Size="Size.Small" OnClick="@(() => suggestion = null)">
+                            Odbaci
+                        </MudButton>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="ApplySuggestion">
+                            Umetni
+                        </MudButton>
+                    </div>
+                </MudPaper>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(suggestionError))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@suggestionError</MudAlert>
+            }
 
             <MudSelect T="int?"
                        @bind-Value="model.ReplacementForEquipmentId"
@@ -70,6 +108,47 @@
     [Parameter] public List<LookupDto> MyEquipment { get; set; } = new();
 
     private SaveEquipmentRequestDto model = new();
+
+    private AiSuggestionDto? suggestion;
+    private bool isSuggesting;
+    private string? suggestionError;
+
+    private async Task SuggestAsync()
+    {
+        suggestionError = null;
+
+        if (model.EquipmentCategoryId <= 0 || string.IsNullOrWhiteSpace(model.Title))
+        {
+            suggestionError = "Za prijedlog je potrebno odabrati kategoriju i upisati naslov.";
+            return;
+        }
+
+        isSuggesting = true;
+
+        var result = await Api.PostAsync<AiSuggestionDto>("api/ai/request-draft", new RequestDraftDto
+        {
+            EquipmentCategoryId = model.EquipmentCategoryId,
+            Title = model.Title.Trim(),
+            ReplacementForEquipmentId = model.ReplacementForEquipmentId
+        });
+
+        isSuggesting = false;
+
+        if (result.IsSuccess && result.Data is not null)
+            suggestion = result.Data;
+        else
+            suggestionError = result.ErrorMessage ?? "Prijedlog nije dohvaćen.";
+    }
+
+    // Prijedlog se nikad ne upisuje sam; korisnik ga izricito umece.
+    private void ApplySuggestion()
+    {
+        if (suggestion is null)
+            return;
+
+        model.Description = suggestion.Text;
+        suggestion = null;
+    }
 
     private void Submit()
     {

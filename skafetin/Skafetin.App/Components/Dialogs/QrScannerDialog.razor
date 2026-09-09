@@ -1,0 +1,122 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Class="mr-2" />
+            @Title
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@errorMessage</MudAlert>
+        }
+        else
+        {
+            <div class="d-flex flex-column align-center">
+                <video id="@videoElementId" playsinline muted
+                       style="width: 100%; max-width: 360px; border-radius: 8px; background: #000;"></video>
+
+                @if (!string.IsNullOrWhiteSpace(warningMessage))
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@warningMessage</MudAlert>
+                }
+
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mt-3 text-center">
+                    Usmjeri kameru na naljepnicu opreme.
+                </MudText>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelAsync">Odustani</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "Skeniranje QR koda";
+
+    private readonly string videoElementId = $"qr-video-{Guid.NewGuid():N}";
+    private DotNetObjectReference<QrScannerDialog>? selfRef;
+    private string? errorMessage;
+    private string? warningMessage;
+    private bool scannerRunning;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var reason = await JS.InvokeAsync<string?>("skafetinQrScanner.unsupportedReason");
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            errorMessage = reason;
+            StateHasChanged();
+            return;
+        }
+
+        selfRef = DotNetObjectReference.Create(this);
+        var startError = await JS.InvokeAsync<string?>("skafetinQrScanner.start", videoElementId, selfRef);
+
+        if (!string.IsNullOrWhiteSpace(startError))
+            errorMessage = startError;
+        else
+            scannerRunning = true;
+
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnCodeDetected(string rawValue)
+    {
+        scannerRunning = false;
+
+        if (!QrCodeReader.TryGetEquipmentId(rawValue, out var equipmentId))
+        {
+            // Skenirano je nešto što nije naljepnica ove aplikacije - kamera se vraća u rad.
+            warningMessage = "Kod nije naljepnica opreme iz Škafetina.";
+            selfRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeAsync<string?>("skafetinQrScanner.start", videoElementId, selfRef);
+            scannerRunning = true;
+            StateHasChanged();
+            return;
+        }
+
+        await StopScannerAsync();
+        MudDialog.Close(DialogResult.Ok(equipmentId));
+    }
+
+    private async Task CancelAsync()
+    {
+        await StopScannerAsync();
+        MudDialog.Cancel();
+    }
+
+    private async Task StopScannerAsync()
+    {
+        if (!scannerRunning)
+            return;
+
+        scannerRunning = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync("skafetinQrScanner.stop");
+        }
+        catch (JSDisconnectedException)
+        {
+            // Veza je već pala; kamera se gasi zajedno s karticom preglednika.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopScannerAsync();
+        selfRef?.Dispose();
+    }
+}

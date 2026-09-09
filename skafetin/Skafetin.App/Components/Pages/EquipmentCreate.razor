@@ -10,6 +10,77 @@
             Icon="@Icons.Material.Filled.Inventory2" />
 
 <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage">
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true" Style="max-width: 860px;">
+        <MudText Typo="Typo.subtitle2">Unos iz bilješke</MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            Zalijepi bilješku s primopredaje, npr. "Dell Latitude 5540, s/n ABC12345, inv 2026-114, prijenosno računalo, Ured načelnika, 1150 EUR".
+        </MudText>
+
+        <MudTextField T="string"
+                      @bind-Value="intakeText"
+                      Label="Bilješka"
+                      Lines="2"
+                      MaxLength="4000"
+                      Variant="Variant.Outlined"
+                      Class="mt-3" />
+
+        <div class="d-flex justify-end mt-2">
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.AutoAwesome"
+                       Disabled="isSuggesting"
+                       OnClick="SuggestIntakeAsync">
+                Predloži iz bilješke
+            </MudButton>
+        </div>
+
+        @if (intake is not null)
+        {
+            <MudPaper Class="pa-3 mt-2" Elevation="0" Outlined="true">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        Prijedlog - pregledaj prije nego popuniš obrazac.
+                    </MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                        Pouzdanost @($"{intake.Confidence * 100:0} %")
+                    </MudChip>
+                </div>
+
+                <MudText Typo="Typo.body2">
+                    @intake.Name
+                    @if (!string.IsNullOrWhiteSpace(intake.InventoryNumber))
+                    {
+                        <span> · @intake.InventoryNumber</span>
+                    }
+                    @if (intake.PurchaseValue is not null)
+                    {
+                        <span> · @intake.PurchaseValue.Value.ToString("0.00") EUR</span>
+                    }
+                </MudText>
+
+                @foreach (var warning in intake.Warnings)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">· @warning</MudText>
+                }
+
+                <div class="d-flex justify-end gap-2 mt-3">
+                    <MudButton Size="Size.Small" OnClick="@(() => intake = null)">Odbaci</MudButton>
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="ApplyIntake">
+                        Popuni obrazac
+                    </MudButton>
+                </div>
+            </MudPaper>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(aiError))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">@aiError</MudAlert>
+        }
+    </MudPaper>
+
     <MudPaper Class="pa-6" Elevation="0" Style="max-width: 860px;">
         <EditForm Model="model" OnValidSubmit="SubmitAsync">
             <DataAnnotationsValidator />
@@ -52,6 +123,7 @@
                                @bind-Value="model.EquipmentCategoryId"
                                For="@(() => model.EquipmentCategoryId)"
                                Variant="Variant.Outlined">
+                        <MudSelectItem T="int" Value="0" Disabled="true">Odaberi kategoriju</MudSelectItem>
                         @foreach (var category in categories)
                         {
                             <MudSelectItem T="int" Value="@category.Id">@category.Name</MudSelectItem>
@@ -76,6 +148,7 @@
                                @bind-Value="model.LocationId"
                                For="@(() => model.LocationId)"
                                Variant="Variant.Outlined">
+                        <MudSelectItem T="int" Value="0" Disabled="true">Odaberi lokaciju</MudSelectItem>
                         @foreach (var location in locations)
                         {
                             <MudSelectItem T="int" Value="@location.Id">@location.Name</MudSelectItem>
@@ -88,6 +161,7 @@
                                      @bind-Value="model.PurchaseValue"
                                      For="@(() => model.PurchaseValue)"
                                      Min="0"
+                                     Max="1000000"
                                      Format="0.00"
                                      Variant="Variant.Outlined" />
                 </MudItem>
@@ -100,12 +174,32 @@
                 </MudItem>
             </MudGrid>
 
+            @if (check is not null)
+            {
+                <MudAlert Severity="@(check.IsReady ? Severity.Success : Severity.Warning)"
+                          Variant="Variant.Outlined"
+                          Class="mt-4">
+                    <MudText Typo="Typo.body2">@check.Summary</MudText>
+                    @foreach (var warning in check.Warnings)
+                    {
+                        <MudText Typo="Typo.caption" Class="d-block">· @warning</MudText>
+                    }
+                </MudAlert>
+            }
+
             <div class="d-flex gap-2 mt-6">
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
                            Color="Color.Secondary"
                            Disabled="isSaving">
                     Spremi
+                </MudButton>
+                <MudButton ButtonType="ButtonType.Button"
+                           Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.FactCheck"
+                           Disabled="isSaving || isChecking"
+                           OnClick="CheckDataAsync">
+                    Provjeri podatke
                 </MudButton>
                 <MudButton Variant="Variant.Outlined"
                            Disabled="isSaving"
@@ -130,6 +224,79 @@
     private bool isLoading = true;
     private bool isSaving;
     private string? errorMessage;
+
+    private string? intakeText;
+    private EquipmentIntakeSuggestionDto? intake;
+    private EquipmentDataCheckDto? check;
+    private bool isSuggesting;
+    private bool isChecking;
+    private string? aiError;
+
+    private async Task SuggestIntakeAsync()
+    {
+        aiError = null;
+
+        if (string.IsNullOrWhiteSpace(intakeText))
+        {
+            aiError = "Upiši bilješku iz koje se izvlače podaci.";
+            return;
+        }
+
+        isSuggesting = true;
+
+        var result = await Api.PostAsync<EquipmentIntakeSuggestionDto>(
+            "api/ai/equipment-intake", new AiFreeTextDto { Text = intakeText.Trim() });
+
+        isSuggesting = false;
+
+        if (result.IsSuccess && result.Data is not null)
+            intake = result.Data;
+        else
+            aiError = result.ErrorMessage ?? "Prijedlog nije dohvaćen.";
+    }
+
+    // Prijedlog popunjava samo prazna polja i nikad ne prepisuje ono sto je korisnik vec upisao.
+    private void ApplyIntake()
+    {
+        if (intake is null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(model.Name))
+            model.Name = intake.Name;
+
+        if (string.IsNullOrWhiteSpace(model.InventoryNumber))
+            model.InventoryNumber = intake.InventoryNumber;
+
+        model.Manufacturer ??= intake.Manufacturer;
+        model.Model ??= intake.Model;
+        model.SerialNumber ??= intake.SerialNumber;
+        model.PurchaseValue ??= intake.PurchaseValue;
+        model.Description ??= intake.Description;
+
+        if (model.EquipmentCategoryId <= 0)
+            model.EquipmentCategoryId = intake.EquipmentCategoryId;
+
+        if (model.LocationId <= 0)
+            model.LocationId = intake.LocationId;
+
+        intake = null;
+        check = null;
+    }
+
+    private async Task CheckDataAsync()
+    {
+        aiError = null;
+        isChecking = true;
+
+        var result = await Api.PostAsync<EquipmentDataCheckDto>("api/ai/equipment-check", model);
+
+        isChecking = false;
+
+        if (result.IsSuccess && result.Data is not null)
+            check = result.Data;
+        else
+            aiError = result.ErrorMessage ?? "Provjera nije uspjela.";
+    }
 
     protected override async Task OnInitializedAsync()
     {

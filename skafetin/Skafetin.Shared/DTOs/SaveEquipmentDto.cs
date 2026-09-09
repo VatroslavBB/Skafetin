@@ -33,6 +33,11 @@ public class SaveEquipmentDto
     [Range(1, int.MaxValue, ErrorMessage = "Van definiranih granica.")]
     public int LocationId { get; set; }
 
-    [Range(typeof(decimal), "0", "9999999999999999.99", ErrorMessage = "Cijena nemoze biti negativna.")]
+    // Granice se parsiraju u invarijantnoj kulturi; na hrvatskom rasporedu je decimalni
+    // razdjelnik zarez, pa bi ih atribut inace odbio i srusio validaciju forme.
+    [Range(typeof(decimal), "0", "1000000",
+        ParseLimitsInInvariantCulture = true,
+        ConvertValueInInvariantCulture = true,
+        ErrorMessage = "Nabavna vrijednost mora biti između 0 i 1.000.000 EUR.")]
     public decimal? PurchaseValue { get; set; }
 }

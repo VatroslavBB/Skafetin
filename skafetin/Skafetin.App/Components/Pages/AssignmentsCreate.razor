@@ -1,6 +1,7 @@
 ﻿@page "/assignments/create"
 @rendermode InteractiveServer
 @inject ApiClient Api
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 
@@ -20,6 +21,10 @@
                                Label="Oprema"
                                @bind-Value="model.EquipmentId"
                                For="@(() => model.EquipmentId)"
+                               Adornment="Adornment.End"
+                               AdornmentIcon="@Icons.Material.Filled.QrCodeScanner"
+                               AdornmentAriaLabel="Skeniraj QR kod opreme"
+                               OnAdornmentClick="ScanAsync"
                                Variant="Variant.Outlined">
                         @foreach (var item in equipment)
                         {
@@ -104,6 +109,32 @@
             errorMessage = result.ErrorMessage;
 
         return result.IsSuccess && result.Data is not null ? result.Data : new List<LookupDto>();
+    }
+
+    private async Task ScanAsync()
+    {
+        var dialog = await DialogService.ShowAsync<QrScannerDialog>("Skeniranje opreme");
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not int equipmentId)
+            return;
+
+        var match = equipment.FirstOrDefault(x => x.Id == equipmentId);
+
+        if (match is not null)
+        {
+            model.EquipmentId = match.Id;
+            Snackbar.Add($"Odabrana oprema: {match.Name}.", Severity.Success);
+            return;
+        }
+
+        var result = await Api.GetAsync<EquipmentDetailsDto>($"api/equipment/{equipmentId}");
+
+        Snackbar.Add(
+            result.IsSuccess && result.Data is not null
+                ? $"Oprema \"{result.Data.Name}\" ({result.Data.InventoryNumber}) nije dostupna za zaduživanje."
+                : "Skenirana oprema ne postoji.",
+            Severity.Warning);
     }
 
     private async Task SubmitAsync()

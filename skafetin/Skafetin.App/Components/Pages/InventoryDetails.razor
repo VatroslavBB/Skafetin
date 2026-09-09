@@ -25,6 +25,26 @@
                     Natrag
                 </MudButton>
 
+                @if (canEditItems)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.QrCodeScanner"
+                               Disabled="isBusy"
+                               OnClick="ScanItemAsync">
+                        Skeniraj
+                    </MudButton>
+                }
+
+                @if (canLock)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.AutoAwesome"
+                               Disabled="isBusy"
+                               OnClick="ShowAiSummaryAsync">
+                        Sažetak
+                    </MudButton>
+                }
+
                 @if (inventory.InventoryStatusId == StatusDraft)
                 {
                     <MudButton Variant="Variant.Filled"
@@ -409,6 +429,60 @@
         onlyDiscrepancies = false;
 
         await ReloadItemsAsync();
+    }
+
+    private async Task ScanItemAsync()
+    {
+        var dialog = await DialogService.ShowAsync<QrScannerDialog>("Skeniranje stavke");
+        var dialogResult = await dialog.Result;
+
+        if (dialogResult is null || dialogResult.Canceled || dialogResult.Data is not int equipmentId)
+            return;
+
+        var item = await FindItemByEquipmentAsync(equipmentId);
+
+        if (item is null)
+            return;
+
+        await CheckItemAsync(item);
+    }
+
+    private async Task<InventoryItemDto?> FindItemByEquipmentAsync(int equipmentId)
+    {
+        var equipmentResult = await Api.GetAsync<EquipmentDetailsDto>($"api/equipment/{equipmentId}");
+
+        if (!equipmentResult.IsSuccess || equipmentResult.Data is null)
+        {
+            Snackbar.Add(equipmentResult.ErrorMessage ?? "Skenirana oprema ne postoji.", Severity.Error);
+            return null;
+        }
+
+        var equipment = equipmentResult.Data;
+        var url = $"api/inventories/{Id}/items?search={Uri.EscapeDataString(equipment.InventoryNumber)}&page=1&pageSize=50";
+        var itemsResult = await Api.GetAsync<PagedResultDto<InventoryItemDto>>(url);
+
+        if (!itemsResult.IsSuccess || itemsResult.Data is null)
+        {
+            Snackbar.Add(itemsResult.ErrorMessage ?? "Dohvat stavke nije uspio.", Severity.Error);
+            return null;
+        }
+
+        var item = itemsResult.Data.Items.FirstOrDefault(x => x.EquipmentId == equipmentId);
+
+        if (item is null)
+            Snackbar.Add($"Oprema \"{equipment.Name}\" ({equipment.InventoryNumber}) nije u ovoj inventuri.", Severity.Warning);
+
+        return item;
+    }
+          
+    private async Task ShowAiSummaryAsync()
+    {
+        var parameters = new DialogParameters<AiSummaryDialog>
+        {
+            { x => x.InventoryId, Id }
+        };
+
+        await DialogService.ShowAsync<AiSummaryDialog>("Prijedlog sažetka inventure", parameters);
     }
 
     private async Task CheckItemAsync(InventoryItemDto item)
