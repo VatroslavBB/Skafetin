@@ -44,9 +44,9 @@ Kriteriji označeni s `[x]` provjereni su u kodu, uz navedeno mjesto. Stavke koj
 | Seed podaci za sve module | [x] | `Data/SeedData.cs`, `SeedData.History.cs`, `SeedData.Media.cs`, `SeedData.Requests.cs`, uz `HasData` za šifrarnike i uloge |
 | README: pokretanje, demo računi, uloge | [x] | `README.md` |
 | Demo korisnici za sve četiri uloge | [x] | `AppUserSeeder` - šest računa, sve četiri uloge, jedan račun s dvije |
-| DBML dijagram | [~] | `docs/skafetin.dbml` - svih 20 tablica odgovara modelima; polja nisu provjerena jedno po jedno |
-| Popis provjerenih workflowa | [ ] | `README.md`, odjeljak "Provjereni tokovi" - popunjava se nakon provjere iz prazne baze |
-| Pokretanje iz prazne baze | [ ] | obrisati `Skafetin.db`, pokrenuti Api |
+| DBML dijagram | [x] | `docs/skafetin.dbml`, kopija u repozitoriju `Skafetin/docs/skafetin.dbml` - svih 20 tablica i sva polja provjerena protiv modela i `SkafetinDbContext`-a |
+| Popis provjerenih workflowa | [x] | `README.md`, odjeljak "Provjereni tokovi" |
+| Pokretanje iz prazne baze | [x] | obrisan `Skafetin.db`, pokretanje Api projekta stvara bazu i seed |
 
 ## Uvjetni dio (bonusi i objava)
 
@@ -63,7 +63,7 @@ Kriteriji označeni s `[x]` provjereni su u kodu, uz navedeno mjesto. Stavke koj
 Odraditi redom, na svježe kloniranom repozitoriju:
 
 - [ ] `dotnet build` prolazi bez grešaka
-- [ ] obrisana `Skafetin.db`, pokretanje Api projekta stvara bazu i seed
+- [x] obrisana `Skafetin.db`, pokretanje Api projekta stvara bazu i seed
 - [ ] Swagger se otvara, poziv bez tokena vraća 401
 - [ ] prijava i odjava rade za sve četiri uloge
 - [ ] račun s dvije uloge vidi zbroj ovlasti obiju
@@ -78,4 +78,3 @@ Odraditi redom, na svježe kloniranom repozitoriju:
 - [ ] dashboard brojači odgovaraju stvarnom stanju u bazi
 - [ ] u bazi nema nijedne lozinke u čistom tekstu
 - [ ] `appsettings.json` u gitu nema pravi JWT ključ ni AI ključ
-- [ ] najmanje osam autorizacijskih testova zapisano u `Skafetin.Api/Skafetin.Api.http`, s barem jednim 200/201/204, jednim 401 i jednim 403

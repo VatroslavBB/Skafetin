@@ -12,6 +12,84 @@ Aplikacija za evidenciju imovine županije: popis opreme po lokacijama i kategor
 | `Skafetin.App` | Blazor Server korisničko sučelje |
 | `Skafetin.Shared` | Modeli i DTO klase koje koriste oba projekta |
 
+## Što aplikacija radi
+
+Škafetin prati imovinu kroz njezin životni ciklus: od unosa u evidenciju, preko zaduživanja zaposlenicima i redovnih inventura, do otpisa. Svaka promjena ostavlja trag, pa se za bilo koji komad opreme može rekonstruirati gdje je bio, kod koga i u kakvom stanju.
+
+### Oprema
+
+Središnja evidencija. Zapis nosi jedinstven inventurni broj, naziv, kategoriju, status, lokaciju te neobavezno proizvođača, model, serijski broj, opis i nabavnu vrijednost.
+
+Popis (`/equipment`) ima pretragu, četiri filtera (kategorija, status, lokacija, zaposlenik), sortiranje po stupcima, stranicanje i gumb za čišćenje filtara. Sve to radi na API strani, nad upitom prema bazi, pa preglednik dobiva samo traženu stranicu.
+
+Profil opreme (`/equipment/{id}`) objedinjuje osnovne podatke, trenutno i prošla zaduženja, povijest statusa, priložene slike i dokumente te QR naljepnicu.
+
+Statusi: `Na skladištu`, `Zaduženo`, `Na servisu`, `Nedostaje`, `Otpisano`. Status se ne uređuje ručno kroz obrazac nego se mijenja radnjama - zaduženjem, povratom, otpisom - a svaka promjena upisuje redak u `EquipmentStatusHistory`.
+
+Osim uređivanja, oprema se može premjestiti na drugu lokaciju (`POST /api/equipment/{id}/move`). Brisanje postoji, ali je ograničeno na `Admin` i namijenjeno ispravku pogrešnog unosa, ne otpisu.
+
+### Zaduženja
+
+Zaduženje povezuje opremu i zaposlenika kroz vremenski period. Statusi: `Aktivno`, `Vraćeno`, `Premješteno`, `Stornirano`.
+
+| Radnja | Što se događa |
+|---|---|
+| Zaduživanje | oprema prelazi u `Zaduženo`, otvara se aktivno zaduženje |
+| Povrat | zaduženje prelazi u `Vraćeno`, oprema se vraća na `Na skladištu` |
+| Prijenos | staro zaduženje se zatvara kao `Premješteno`, otvara se novo s vezom `PreviousAssignmentId` na prethodno |
+| Storniranje | poništava pogrešno unesen zapis, bez brisanja |
+
+Poslovna pravila koja API provodi: ista oprema ne može imati dva aktivna zaduženja istovremeno, otpisana oprema se ne može zadužiti, a datum povrata ne može biti raniji od datuma zaduženja. Zaduženja se ne brišu - povijest ostaje cjelovita.
+
+### Inventure
+
+Inventura se otvara za jednu lokaciju i dobiva popis stavaka - svu opremu koja bi po evidenciji trebala biti tamo. Statusi: `Nacrt`, `Otvorena`, `U tijeku`, `Završena`, `Zaključana`.
+
+Svaka stavka bilježi očekivano stanje (lokacija, zaduženi zaposlenik) i stvarno stanje koje popisivač upisuje: je li pronađena, je li oštećena, na kojoj je lokaciji zatečena ako nije na svojoj, bilješku te tko je i kada provjerio. Iz toga se računa sažetak: ukupno, popisano, manjak, oštećeno, krivo mjesto.
+
+Zaključana inventura je zatvoren dokument - pokušaj izmjene stavke ili statusa vraća `400`. Nositelj uloge `LocationResponsible` vidi i vodi samo inventure svoje lokacije; provjera se radi usporedbom `Inventory.LocationId` s claimom iz tokena, a ne skrivanjem gumba.
+
+### Zahtjevi za opremom
+
+Zaposlenik traži opremu preko `/my-requests`, bez pristupa ostatku sustava. Zahtjev prolazi kroz statuse `Zaprimljeno` → `U obradi` → `Odobreno` ili `Odbijeno` → `Realizirano` → `Zatvoreno`.
+
+Obrada je posao uloge `InventoryManager`. Realizacija zahtjeva povezuje odobreni zahtjev s konkretnom opremom i odmah stvara zaduženje, pa se ne mora raditi u dva koraka.
+
+### Otpis
+
+Otpis je odvojen postupak jer ima posljedicu koja se ne vraća. Statusi: `Zaprimljeno`, `U obradi`, `Odobreno`, `Odbijeno`, `Provedeno`.
+
+Zahtjev za otpisom smije podnijeti `InventoryManager` ili `LocationResponsible`, obraditi ga `InventoryManager`, ali **provedbu smije potvrditi samo `Admin`** (`POST /api/writeoffrequests/{id}/execute`). Provedbom oprema prelazi u status `Otpisano` i od tog trenutka se više ne može zadužiti.
+
+### Početna stranica
+
+Brojači se računaju na API-ju (`GET /api/dashboard/summary`), s `CountAsync` nad upitima prema bazi - aplikacija ne dovlači zapise pa ih broji u pregledniku. Prikazuju se ukupna oprema i raspodjela po statusima, otvoreni zahtjevi, inventure u tijeku te posljednjih pet događaja po modulima. Zaposlenik na istoj stranici vidi svoje brojeve: koliko opreme ima zaduženo i koliko mu je zahtjeva u obradi.
+
+### Šifrarnici i administracija
+
+Lokacije i zaposlenici imaju vlastite CRUD ekrane. `InventoryManager` ih vidi, ali unos, izmjenu i brisanje smije samo `Admin` - to su podaci na koje se veže cijela evidencija. Vrste lokacija, kategorije opreme i svi statusi su šifrarnici koji se pune migracijom (`HasData`) i dolaze s API-ja - nijedna padajuća lista u sučelju nije tvrdo kodirana.
+
+Administracija računa i uloga (`/users`) je dostupna samo ulozi `Admin`: stvaranje računa za postojećeg zaposlenika, dodjela uloga, aktivacija i deaktivacija te promjena lozinke.
+
+### Ekrani
+
+| Putanja | Ekran | U izborniku za |
+|---|---|---|
+| `/` | Početna s brojačima i zadnjim događajima | sve prijavljene |
+| `/login` | Prijava | neprijavljene |
+| `/equipment`, `/equipment/create`, `/equipment/{id}`, `/equipment/edit/{id}` | Oprema: popis, unos, profil, uređivanje | Admin, InventoryManager, LocationResponsible |
+| `/assignments`, `/assignments/create` | Zaduženja | Admin, InventoryManager, LocationResponsible |
+| `/inventories`, `/inventories/{id}` | Inventure i popis stavaka | Admin, InventoryManager, LocationResponsible |
+| `/equipment-requests` | Obrada zahtjeva za opremom | Admin, InventoryManager |
+| `/write-off-requests` | Otpis | Admin, InventoryManager |
+| `/locations`, `/employees` (+ `/create`, `/edit/{id}`) | Šifrarnici | Admin, InventoryManager |
+| `/my-equipment`, `/my-requests` | Vlastita oprema i vlastiti zahtjevi | sve prijavljene |
+| `/users` | Korisnici i uloge | Admin |
+
+Stupac govori komu se stavka pojavljuje u izborniku (`NavMenu.razor`, kroz `AuthorizeView`). To je stvar preglednosti, a ne zaštite: tko upiše putanju ručno, stranica će se otvoriti, ali će poziv API-ja vratiti `403` i korisnik završava na ekranu s porukom da nema ovlasti. Podatak ne izlazi iz API-ja ni u jednom slučaju.
+
+Uz ekrane ide petnaestak MudBlazor dijaloga za radnje koje ne zaslužuju vlastitu stranicu - povrat, prijenos, storniranje, obrada zahtjeva, provjera stavke inventure, QR naljepnica i skener, AI sažetak, promjena lozinke.
+
 ## Pokretanje
 
 Potreban je .NET 10 SDK.
@@ -87,6 +165,25 @@ Employee       ← poslovni profil: ime, e-pošta, radno mjesto, lokacija
 
 Osobne rute: `GET /api/assignments/mine`, `GET /api/equipmentrequests/mine`, `POST /api/equipmentrequests/mine`.
 
+## Pregled API-ja
+
+Cjelovit popis s tijelima zahtjeva i odgovorima je u Swaggeru (`https://localhost:7126/swagger`). Ovdje je pregled skupina i tko im smije pristupiti.
+
+| Skupina ruta | Sadržaj | Politika |
+|---|---|---|
+| `/api/auth` | prijava, podaci o prijavljenom korisniku | otvorena prijava, ostalo prijavljen korisnik |
+| `/api/equipment` | CRUD, popis sa serverskim filtriranjem, `lookup`, premještanje, QR kod | čitanje prijavljen, izmjene `Manage`, brisanje `AdminOnly` |
+| `/api/equipmentmedia` | slike i dokumenti uz opremu, naslovna slika | čitanje prijavljen, upload i brisanje `Manage` |
+| `/api/assignments` | zaduženja, povrat, prijenos, storniranje, `mine` | čitanje `InventoryWork`, izmjene `Manage`, `mine` prijavljen korisnik |
+| `/api/inventories` | inventure, stavke, promjena statusa | `InventoryWork`, uz dodatnu provjeru lokacije |
+| `/api/equipmentrequests` | zahtjevi za opremom, obrada, realizacija, `mine` | obrada `Manage`, `mine` prijavljen korisnik |
+| `/api/writeoffrequests` | zahtjevi za otpisom, obrada, provedba | unos `InventoryWork`, obrada `Manage`, provedba `AdminOnly` |
+| `/api/locations`, `/api/employees` | lokacije i zaposlenici, puni CRUD i `lookup` rute | lokacije čitanje prijavljen, popis zaposlenika `Manage`, sve izmjene i brisanja `AdminOnly` |
+| `/api/equipmentcategories`, `/api/locationtypes`, `/api/equipmentstatuses`, `/api/assignmentstatuses`, `/api/inventorystatuses`, `/api/requeststatuses`, `/api/writeoffrequeststatuses` | šifrarnici samo za čitanje | prijavljen korisnik |
+| `/api/users`, `/api/roles` | računi i uloge | `AdminOnly` |
+| `/api/dashboard/summary` | agregati za početnu stranicu | prijavljen korisnik |
+| `/api/ai` | prijedlozi, opisani niže | vidi tablicu u odjeljku o AI-u |
+
 ## 401 i 403
 
 | Status | Značenje | Kad se pojavi |
@@ -154,7 +251,25 @@ Adresa koja se upisuje u kod dolazi iz postavke `AppBaseUrl` u `Skafetin.Api/app
 
 ## Provjereni tokovi
 
-_Popuniti nakon provjere iz prazne baze._
+Provjereno ručno kroz sučelje, na bazi stvorenoj iz nule: obrisan `Skafetin.db`, pokretanjem API projekta primijenjene migracije, šifrarnici i demo sadržaj.
+
+| Tok | Rezultat |
+|---|---|
+| Pokretanje iz prazne baze - migracije, šifrarnici, seed podaci i demo računi | prolazi |
+| Swagger se otvara, poziv bez tokena vraća `401` | prolazi |
+| Prijava i odjava za sve četiri uloge | prolazi |
+| Račun s dvije uloge (`marko.juric`) vidi zbroj ovlasti obiju: na popisu inventura sve lokacije, dok `ana.peric` vidi samo svoju | prolazi |
+| Unos opreme → zaduženje → prijenos → povrat; povijest sadrži sve zapise | prolazi |
+| Otvaranje inventure → popis stavaka → završetak → zaključavanje → pokušaj izmjene vraća `400` | prolazi |
+| Zahtjev zaposlenika → obrada → odobrenje → realizacija | prolazi |
+| Zahtjev za otpisom → odobrenje → provedba → pokušaj zaduženja otpisane opreme vraća `400` | prolazi |
+| Pretraga, filtri i reset na ekranima Oprema i Inventure | prolazi |
+| Loading i error stanja (ugašen API pa otvorena stranica) | prolazi |
+| Upload: `.exe` odbijen, prevelik PDF odbijen, slika prolazi i prikazuje se | prolazi |
+| Brisanje dokumenta uklanja i datoteku s diska | prolazi |
+| Brojači na početnoj stranici odgovaraju stanju u bazi | prolazi |
+| U bazi nema lozinke u čistom tekstu, spremaju se samo hash i sol | prolazi |
+
 
 ## Poznata ograničenja
 
@@ -167,5 +282,7 @@ _Popuniti nakon provjere iz prazne baze._
 ## Dokumentacija
 
 - `docs/provjera-zahtjeva.md` - popis kriterija po kojima se projekt ocjenjuje, sa stanjem i mjestom gdje je svaki ispunjen.
+- `docs/skafetin.dbml` - dijagram baze, svih 20 tablica s vezama. Otvara se na https://dbdiagram.io.
+- Swagger na `https://localhost:7126/swagger` - cjelovit ugovor API-ja s tijelima zahtjeva i odgovorima.
 
-Opseg, model podataka, ugovor API-ja, plan izrade i git workflow vode se izvan ovog repozitorija, zajedno s DBML dijagramom baze.
+Opseg, plan izrade i git workflow vode se izvan ovog repozitorija.
