@@ -281,8 +281,5 @@ Provjereno ručno kroz sučelje, na bazi stvorenoj iz nule: obrisan `Skafetin.db
 
 ## Dokumentacija
 
-- `docs/provjera-zahtjeva.md` - popis kriterija po kojima se projekt ocjenjuje, sa stanjem i mjestom gdje je svaki ispunjen.
 - `docs/skafetin.dbml` - dijagram baze, svih 20 tablica s vezama. Otvara se na https://dbdiagram.io.
 - Swagger na `https://localhost:7126/swagger` - cjelovit ugovor API-ja s tijelima zahtjeva i odgovorima.
-
-Opseg, plan izrade i git workflow vode se izvan ovog repozitorija.
