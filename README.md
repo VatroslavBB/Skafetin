@@ -166,4 +166,6 @@ _Popuniti nakon provjere iz prazne baze._
 
 ## Dokumentacija
 
-Opseg, model podataka, ugovor API-ja, plan izrade, provjera zahtjeva i git workflow su u mapi `docs/` izvan ovog repozitorija, uz DBML dijagram baze (`docs/skafetin.dbml`).
+- `docs/provjera-zahtjeva.md` - popis kriterija po kojima se projekt ocjenjuje, sa stanjem i mjestom gdje je svaki ispunjen.
+
+Opseg, model podataka, ugovor API-ja, plan izrade i git workflow vode se izvan ovog repozitorija, zajedno s DBML dijagramom baze.
