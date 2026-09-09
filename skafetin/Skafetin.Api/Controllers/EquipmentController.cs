@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QRCoder;
 using Skafetin.Api.Data;
 using Skafetin.Api.Security;
 using Skafetin.Shared.DTOs;
@@ -16,12 +17,15 @@ public class EquipmentController : ControllerBase
     private const int DefaultPageSize = 20;
     private const int MaxPageSize = 100;
     private const int EquipmentStatusWriteOff = 5;
+    private const int QrPixelsPerModule = 15;
 
     private readonly SkafetinDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public EquipmentController(SkafetinDbContext context)
+    public EquipmentController(SkafetinDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
 
     private static readonly Expression<Func<Equipment, EquipmentDto>> ToDto = e => new EquipmentDto
@@ -170,6 +174,31 @@ public class EquipmentController : ControllerBase
             return NotFound();
 
         return Ok(result);
+    }
+
+    [HttpGet("{id:int}/qr")]
+    [Produces("image/png")]
+    public async Task<IActionResult> GetEquipmentQrCode(int id)
+    {
+        var inventoryNumber = await _context.Equipment
+            .Where(e => e.Id == id)
+            .Select(e => e.InventoryNumber)
+            .FirstOrDefaultAsync();
+
+        if (inventoryNumber is null)
+            return NotFound();
+
+        var appBaseUrl = _configuration["AppBaseUrl"];
+        if (string.IsNullOrWhiteSpace(appBaseUrl))
+            throw new InvalidOperationException("Postavka 'AppBaseUrl' nije postavljena, pa se QR kod ne može generirati.");
+
+        var profileUrl = new Uri(new Uri(appBaseUrl), $"equipment/{id}").ToString();
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(profileUrl, QRCodeGenerator.ECCLevel.Q);
+        var png = new PngByteQRCode(data).GetGraphic(QrPixelsPerModule);
+
+        return File(png, "image/png", $"qr-{inventoryNumber}.png");
     }
 
     [Authorize(Policy = AuthorizationPolicies.Manage)]

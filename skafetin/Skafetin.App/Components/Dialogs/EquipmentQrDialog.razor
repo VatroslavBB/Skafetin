@@ -1,0 +1,86 @@
+@inject ApiClient Api
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.QrCode2" Class="mr-2" />
+            QR kod opreme
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <LoadingArea IsLoading="isLoading" ErrorMessage="@errorMessage" Rows="3">
+            <div class="d-flex flex-column align-center">
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <img src="@imageSource" alt="QR kod opreme @InventoryNumber" width="240" height="240" />
+                </MudPaper>
+
+                <MudText Typo="Typo.subtitle1" Class="mt-3">@InventoryNumber</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@EquipmentName</MudText>
+
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mt-3 text-center">
+                    Skeniranjem se otvara profil ove opreme.
+                </MudText>
+            </div>
+        </LoadingArea>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Zatvori</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Download"
+                   Disabled="@(png is null)"
+                   OnClick="DownloadAsync">
+            Preuzmi
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public int EquipmentId { get; set; }
+    [Parameter] public string? InventoryNumber { get; set; }
+    [Parameter] public string? EquipmentName { get; set; }
+
+    private byte[]? png;
+    private string? imageSource;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await Api.GetBytesAsync($"api/equipment/{EquipmentId}/qr");
+
+            if (result.IsSuccess && result.Data is not null)
+            {
+                png = result.Data;
+                imageSource = $"data:image/png;base64,{Convert.ToBase64String(png)}";
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "QR kod nije dostupan.";
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (png is null)
+            return;
+
+        await JS.InvokeVoidAsync(
+            "skafetinFiles.open",
+            Convert.ToBase64String(png),
+            "image/png",
+            $"qr-{InventoryNumber}.png");
+    }
+
+    private void Close() => MudDialog.Cancel();
+}

@@ -1,3 +1,26 @@
-@Skafetin.Api_HostAddress = http://localhost:5117
+@Skafetin.Api_HostAddress = https://localhost:7126
+
+### Prijava - token iz odgovora koriste zahtjevi ispod.
+# @name login
+POST {{Skafetin.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Skafetin1!"
+}
+
+@token = {{login.response.body.$.accessToken}}
+
+### QR kod postojece opreme - ocekuje se 200 i PNG.
+GET {{Skafetin.Api_HostAddress}}/api/equipment/1/qr
+Authorization: Bearer {{token}}
+
+### QR kod nepostojece opreme - ocekuje se 404.
+GET {{Skafetin.Api_HostAddress}}/api/equipment/999999/qr
+Authorization: Bearer {{token}}
+
+### Bez tokena - ocekuje se 401.
+GET {{Skafetin.Api_HostAddress}}/api/equipment/1/qr
 
 ###
