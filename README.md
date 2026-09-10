@@ -2,6 +2,14 @@
 
 Aplikacija za evidenciju imovine županije: popis opreme po lokacijama i kategorijama, zaduživanje opreme zaposlenicima s cjelovitom poviješću, inventure po lokacijama sa stavkama i odstupanjima, zahtjevi zaposlenika za opremom, postupak otpisa te slike i dokumenti uz opremu. Pristup je moguć tek nakon prijave, a što korisnik vidi i smije ovisi o njegovim ulogama.
 
+## Demo verzija
+
+Aplikacija je objavljena na **https://skafetin.duckdns.org**, a prijava ide demo računima iz odjeljka niže.
+
+Poslužitelj je Ubuntu na kojem se `Skafetin.Api` i `Skafetin.App` vrte kao dva systemd servisa pod servisnim korisnikom, svaki na svom portu i dostupni samo lokalno. Prema van je izložen jedino nginx: on radi kao reverse proxy prema App-u, terminira HTTPS certifikatom Let's Encrypta i prosljeđuje WebSocket vezu koju Blazor Server drži. Api nema javnu adresu jer ga App zove interno.
+
+Baza, uploadane datoteke i ključevi za zaštitu sesija stoje izvan mape aplikacije, pa preživljavaju svaku novu objavu. JWT ključ dolazi iz varijable okruženja na poslužitelju i nije u repozitoriju.
+
 ## Tehnologije
 
 .NET 10, ASP.NET Core Web API, Blazor Server s MudBlazor, EF Core i SQLite, JWT autentifikacija.
